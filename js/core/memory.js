@@ -33,9 +33,45 @@ MemoryMap.regions = {
 
 MemoryMap.offsets = {};
 
+// ignored addresses from "non-standard" mapping locations like kseg2
 MemoryMap.ignoredAddresses = {
-	0x1ffe0130: true, // BIU/cache config register; see doc/fffe0130.txt
+	0x1ffe0130: "BIO/cache config register", // see doc/fffe0130.txt
 };
+
+MemoryMap.writeActions = {
+	0x1f801000: function() { /* mystery, ignored */ },
+	0x1f801004: function() { /* mystery, ignored */ },
+	0x1f801008: function() { /* mystery, ignored */ },
+	0x1f80100c: function() { /* mystery, ignored */ },
+	0x1f801010: function() { /* mystery, ignored */ },
+	0x1f801014: function() { /* spu_delay; mystery, ignored */ },
+	0x1f801018: function() { /* dv5_delay; mystery, ignored */ },
+	0x1f80101c: function() { /* mystery, ignored */ },
+	0x1f801020: function() { /* com_delay; mystery, ignored */ },
+	0x1f801060: function() { /* ram_size; mystery, ignored */ },
+};
+
+MemoryMap.prototype.isHardwareRegister = function(address)
+{
+	const startAddress = 0x1F801000;
+	const endAddress = startAddress + MemoryMap.regions.registers;
+	return address >= startAddress && address < endAddress;
+}
+
+MemoryMap.prototype.performHardwareFunctions = function(address, oldValue)
+{
+	var newValue = this.u32[this.translate(address) >>> 2];
+	if (address in MemoryMap.writeActions)
+	{
+		MemoryMap.writeActions[address].call(this, address, oldValue, newValue);
+		return;
+	}
+	
+	var message = "write at address " + address.toString(16)
+				+ ": " + oldValue.toString(16)
+				+ " -> " + newValue.toString(16);
+	console.warn(message);
+}
 
 MemoryMap.prototype.translate = function(address)
 {
@@ -70,10 +106,7 @@ MemoryMap.prototype.translate = function(address)
 		return unmapped();
 	
 	if (address < 0x1F803000)
-	{
-		this.diags.warn("accessing hardware register at " + address.toString(16));
 		return address - 0x1F801000 + MemoryMap.offsets.registers;
-	}
 	
 	if (address < 0x1FC00000)
 		return unmapped();
@@ -121,34 +154,17 @@ MemoryMap.prototype.write8 = function(address, value)
 				  | (x >>> 24);
 		}
 		
-		MemoryMap.prototype.read16 = function(address)
-		{
-			var translated = this.translate(address) >>> 1;
-			return swap16(this.u16[translated]);
-		}
-		
-		MemoryMap.prototype.read32 = function(address)
-		{
-			var translated = this.translate(address) >>> 2;
-			return swap32(this.u32[translated]);
-		}
-		
-		MemoryMap.prototype.write16 = function(address, value)
-		{
-			var translated = this.translate(address) >>> 1;
-			this.u16[translated] = swap16(value);
-		}
-		
-		MemoryMap.prototype.write32 = function(address, value)
-		{
-			var translated = this.translate(address) >>> 2;
-			this.u32[translated] = swap32(value);
-		}
+		console.error("JSX does not support big-endian processors at the moment");
 	}
 	else
 	{
 		// little-endian; praise the lord!
 		MemoryMap.endianness = "little";
+		
+		MemoryMap.prototype.read8 = function(address)
+		{
+			return this.u8[this.translate(address)];
+		}
 		
 		MemoryMap.prototype.read16 = function(address)
 		{
@@ -160,14 +176,37 @@ MemoryMap.prototype.write8 = function(address, value)
 			return this.u32[this.translate(address) >>> 2];
 		}
 		
+		MemoryMap.prototype.write8 = function(address, value)
+		{
+			var translated = this.translate(address);
+			
+			var oldWordValue = this.u32[translated >>> 2];
+			this.u8[translated] = value;
+			
+			if (this.isHardwareRegister(address))
+				this.performHardwareFunctions(address, oldWordValue);
+		}
+		
 		MemoryMap.prototype.write16 = function(address, value)
 		{
-			this.u16[this.translate(address) >>> 1] = value;
+			var translated = this.translate(address) >>> 1;
+			
+			var oldWordValue = this.u32[translated >>> 1];
+			this.u16[translated] = value;
+			
+			if (this.isHardwareRegister(address))
+				this.performHardwareFunctions(address, oldWordValue);
 		}
 		
 		MemoryMap.prototype.write32 = function(address, value)
 		{
-			this.u32[this.translate(address) >>> 2] = value;
+			var translated = this.translate(address) >>> 2;
+			
+			var oldWordValue = this.u32[translated];
+			this.u32[translated] = value;
+			
+			if (this.isHardwareRegister(address))
+				this.performHardwareFunctions(address, oldWordValue);
 		}
 	}
 	
