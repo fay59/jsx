@@ -134,7 +134,8 @@ R3000a.prototype.execute = function(address)
 
 R3000a.prototype.executeOne = function(address)
 {
-	return this.recompiler.recompileOne(this.memory, address).call(this);
+	var func = this.recompiler.recompileOne(this.memory, address);
+	return func.call(this);
 }
 
 R3000a.prototype.executeUntilBranchOrAddress = function(address, destAddress)

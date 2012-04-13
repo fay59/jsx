@@ -29,6 +29,8 @@ document.addEventListener("DOMContentLoaded", function()
 			diagnostics.log("running to " + Recompiler.formatHex32(pc));
 			runHandle = dbg.runUntil(pc);
 			pauseButton.disabled = false;
+			stepOverButton.disabled = true;
+			stepIntoButton.disabled = true;
 		}
 	}
 	
@@ -82,6 +84,7 @@ document.addEventListener("DOMContentLoaded", function()
 		}
 		
 		pauseButton.disabled = true;
+		stepOverButton.disabled = false;
 		stepIntoButton.disabled = !dbg.canStepInto();
 		diagnostics.log("BIOS » " + Recompiler.formatHex32(dbg.pc));
 	}

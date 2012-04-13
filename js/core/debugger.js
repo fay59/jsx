@@ -20,7 +20,7 @@ Debugger.prototype._stepCallback = function()
 
 Debugger.prototype.getGPR = function(index)
 {
-	return Recompiler.formatHex32(this.cpu.gpr[index]);
+	return "0x" + Recompiler.formatHex32(this.cpu.gpr[index]);
 }
 
 Debugger.prototype.setGPR = function(index, value)
@@ -49,7 +49,7 @@ Debugger.prototype.setGPR = function(index, value)
 
 Debugger.prototype.getCPR = function(index)
 {
-	return Recompiler.formatHex32(this.cpu.cop0_reg[index]);
+	return "0x" + Recompiler.formatHex32(this.cpu.cop0_reg[index]);
 }
 
 Debugger.prototype.setCPR = function(index, value)
@@ -72,7 +72,20 @@ Debugger.prototype.setCPR = function(index, value)
 Debugger.prototype.stepOver = function()
 {
 	this.updateTrace();
-	this.pc = this.cpu.executeOne(this.pc);
+	
+	// jr ra must be manually implemented
+	var bits = this.cpu.memory.read32(this.pc);
+	var opcode = Disassembler.getOpcode(bits);
+	if (opcode.instruction.name == "jr" && opcode.params[0] == 31)
+	{
+		// execute the delay slot then return
+		this.cpu.executeOne(this.pc + 4);
+		this.pc = this.cpu.gpr[31];
+	}
+	else
+	{
+		this.pc = this.cpu.executeOne(this.pc);
+	}
 	this._stepCallback();
 }
 
@@ -128,7 +141,7 @@ Debugger.prototype.runUntil = function(desiredPC)
 				this.running = false;
 				this._stepCallback();
 			}
-		}.bind(self)
+		}.bind(self),
 	};
 	
 	var runOneBlock = function()

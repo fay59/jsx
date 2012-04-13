@@ -84,6 +84,8 @@ DisassemblyTable.prototype.disassemble = function(memory, address, onclick)
 		tr.classList.add("nop");
 	if (translatedAddress >= memory.invalidAddress)
 		tr.classList.add("invalid");
+	else if (comment !== undefined && (comment[0] == "j" || comment[0] == "b"))
+		tr.classList.add("jump");
 	
 	tr.appendChild(actionTD);
 	tr.appendChild(addressTD);

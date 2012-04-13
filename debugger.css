@@ -51,6 +51,7 @@ input {
 #disassembly tr.before :first-child { color: #A66; }
 #disassembly tr.nop :not(:first-child) { opacity: 0.5; }
 #disassembly tr.invalid { color: red; }
+#disassembly tr.jump { color: blue; }
 
 .regs {
 	display: block;

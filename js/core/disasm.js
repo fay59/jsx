@@ -237,7 +237,7 @@ Disassembler.patternData = {
 	},
 	'jalr': {	// jump and link register
 		pattern: '0000 00ss sss0 0000 dddd d000 0000 1001',
-		format: 'jalr {d}, {s}'
+		format: 'jalr {s}, {d}'
 	},
 	'jr': {	// jump register
 		pattern: '0000 00ss sss0 0000 0000 0000 0000 1000',

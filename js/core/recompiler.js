@@ -644,7 +644,7 @@ Recompiler.prototype.recompileBlock = function(memory, address, maxAddress)
 	});
 	
 	impl("lw", function(s, t, i) {
-		return gpr(t) + " = this.memory.read32(" + gpr(t) + " + " + hex(i) + ");\n";
+		return load(32, s, i, t);
 	});
 	
 	impl("lwc2", function() {
