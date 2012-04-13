@@ -1,0 +1,74 @@
+html, body, input {
+	font-family: Consolas, monospace;
+	font-size: 10pt;
+}
+
+input {
+	text-align: right;
+	margin-left: 5px;
+}
+
+#screen {
+	float: left; 
+	width: 640px;
+	height: 480px;
+	margin-right: 20px;
+	border: 1px #000 solid;
+}
+
+#regs span {
+	cursor: pointer;
+}
+
+#regs {
+	max-width: 500px;
+	float: left;
+}
+
+#regs > div {
+	max-height: -webkit-calc(465px - 2em);
+	overflow: hidden;
+	padding-top: 15px;
+}
+
+#disassembly {
+	float: left;
+	height: -webkit-calc(480px - 1em);
+	overflow: hidden;
+}
+
+#disassembly > div {
+	overflow: auto;
+	height: -webkit-calc(100% - 2em);
+}
+
+#disassembly td:nth-child(1) { width: 10px; }
+#disassembly td:nth-child(2) { width: 10ex; }
+#disassembly td:nth-child(3) { width: auto; }
+
+#disassembly tr:not(.after):not(.before) { font-weight: bold; }
+#disassembly tr.after :first-child { color: #6A6; }
+#disassembly tr.before :first-child { color: #A66; }
+#disassembly tr.nop :not(:first-child) { opacity: 0.5; }
+#disassembly tr.invalid { color: red; }
+
+.regs {
+	display: block;
+	float: left;
+	height: 480px;
+	margin-right: 20px;
+	margin-top: -0.5em;
+	max-width: 480px;
+}
+
+.regs label {
+	display: block;
+	text-align: right;
+	float: left;
+	width: 210px;
+	margin: 0em 1em;
+}
+
+th {
+	text-align: left;
+}

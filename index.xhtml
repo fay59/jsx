@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>JSX – A Javascript PlayStation emulator</title>
+	<link rel="stylesheet" type="text/css" href="jsx.css"/>
+	<script type="text/javascript" src="js/core/disasm.js"/>
+	<script type="text/javascript" src="js/core/r3000a.js"/>
+	<script type="text/javascript" src="js/core/memory.js"/>
+	<script type="text/javascript" src="js/core/recompiler.js"/>
+	<script type="text/javascript" src="js/status.js"/>
+	<script type="text/javascript" src="js/jsx.js"/>
+</head>
+<body>
+
+<h1>JS64: a Javascript PlayStation emulator</h1>
+<canvas id="screen">
+	<div class="sad">
+		<p id="fail-message"/>
+		<p>Get (or update) one of these:</p>
+		<p>
+			<a class="get-browser" href="https://google.com/chrome"><img src="images/supported-browsers/chrome.png" alt="Chrome"/></a>
+			<a class="get-browser" href="http://firefox.com/"><img src="images/supported-browsers/firefox.png" alt="Firefox"/></a>
+			<a class="get-browser" href="http://opera.com/"><img src="images/supported-browsers/opera.png" alt="Opera"/></a>
+			<a class="get-browser" href="http://apple.com/safari/"><img src="images/supported-browsers/safari.png" alt="Safari"/></a>
+		</p>
+		<p class="comment">
+			Sorry, Internet Explorer users: the latest versions are great, but Microsoft
+			<a href="http://blogs.technet.com/b/srd/archive/2011/06/16/webgl-considered-harmful.aspx">will not implement WebGL</a>.
+		</p>
+	</div>
+</canvas>
+<div id="control">
+	<input type="file" id="bios-picker"/>
+	<input type="file" id="disk-picker"/>
+	<span id="status"/>
+</div>
+
+<div class="comment">
+<p>JSX is a PlayStation emulator written entirely in Javascript, as a testimony
+	to the power of the Web platform. Unthinkable just a few years ago, this
+	project makes use of a lot of new technologies, like the File API, typed
+	arrays and WebGL. To achieve decent speed, it dynamically recompiles
+	PlayStation programs into Javascript, the same technique used by very
+	lower-level emulators (although with a completely different implementation).
+	Sound is not rendered as the current audio APIs do not allow it.</p>
+<p>This is a kind of follow-up on my previous emulator,
+	<a href="//assets/nejs/">NeJS</a>, that didn't benefit from all of these
+	cool advances.</p>
+<p>The JSX author is in no way affiliated to Sony and JSX is not endorsed by
+	Sony.</p>
+</div>
+</body>
+</html>

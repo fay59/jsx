@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>JS64 – Debugger</title>
+	<link rel="stylesheet" type="text/css" href="debugger.css"/>
+	<script type="text/javascript" src="js/core/disasm.js"/>
+	<script type="text/javascript" src="js/core/r3000a.js"/>
+	<script type="text/javascript" src="js/core/memory.js"/>
+	<script type="text/javascript" src="js/core/recompiler.js"/>
+	<script type="text/javascript" src="js/core/debugger.js"/>
+	<script type="text/javascript" src="js/status.js"/>
+	<script type="text/javascript" src="js/disasm-table.js"/>
+	<script type="text/javascript" src="js/debug.js"/>
+</head>
+<body>
+
+<div id="control">
+	<input type="file" id="rom-picker"/>
+	<span id="status"/>
+</div>
+<fieldset id="regs">
+	<legend>
+		<span>GPR</span> /
+		<span>CPR</span>
+	</legend>
+	<div>
+		<div class="regs"/>
+		<div class="regs"/>
+	</div>
+</fieldset>
+
+<fieldset id="disassembly">
+	<legend>Disassembly</legend>
+	<button id="refresh">⟳</button>
+	<button id="step-over">Step over</button>
+	<button id="step-into">Step into</button>
+	<button id="pause">Pause</button>
+	<button id="goto">Go to...</button>
+	<div id="disasm-container">
+		<table id="disasm"/>
+	</div>
+</fieldset>
+
+</body>
+</html>

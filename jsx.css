@@ -1,0 +1,46 @@
+body {
+	font-family: "Lucida Grande", "Trebuchet MS", Verdana, sans-serif;
+}
+
+#screen, .sad {
+	display: block;
+	margin: 0px auto;
+	margin-bottom: 10px;
+	
+	background-position: center center;
+	background-repeat: no-repeat;
+}
+
+#screen {
+	background-image: url('images/jsx.png');
+	width: 640px;
+	height: 480px;
+}
+
+#control {
+	border: 1px #888 solid;
+	font-size: 10pt;
+	color: #888;
+}
+
+.sad {
+	text-align: center;
+	background-image: url('images/jsx-sad.png');
+	border: 1px #888 dotted;
+	
+	width: 440px;
+	height: 280px;
+	padding: 100px;
+	text-shadow: 0px 0px 5px #fff;
+}
+
+.comment {
+	margin-top: 1em;
+	padding-top: 0em;
+	font-size: 8pt;
+}
+
+.get-browser img {
+	width: 64px;
+	height: 64px;
+}
