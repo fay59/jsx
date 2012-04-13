@@ -33,38 +33,41 @@ MemoryMap.regions = {
 
 MemoryMap.offsets = {};
 
+MemoryMap.ignoredAddresses = {
+	0x1ffe0130: true, // BIU/cache config register; see doc/fffe0130.txt
+};
+
 MemoryMap.prototype.translate = function(address)
 {
 	if (address === undefined)
 		throw new Error("undefined address");
+	
+	var self = this;
+	function unmapped()
+	{
+		if (!(address in MemoryMap.ignoredAddresses))
+			self.diags.warn("accessing unmapped memory address " + address.toString(16));
+		return self.backbuffer.byteLength;
+	}
 	
 	address &= 0x1FFFFFFF;
 	if (address < 0x200000)
 		return address;
 	
 	if (address < 0x1F000000)
-	{
-		this.diags.warn("accessing unmapped memory address " + address.toString(16));
-		return this.backbuffer.byteLength;
-	}
+		return unmapped();
 	
-	if (address < 0x1F01000)
+	if (address < 0x1F010000)
 		return address - 0x1F000000 + MemoryMap.offsets.parallelPort;
 	
 	if (address < 0x1F800000)
-	{
-		this.diags.warn("accessing unmapped memory address " + address.toString(16));
-		return this.backbuffer.byteLength;
-	}
+		return unmapped();
 	
 	if (address < 0x1F800400)
 		return address - 0x1F800000 + MemoryMap.offsets.scratch;
 	
 	if (address < 0x1F801000)
-	{
-		this.diags.warn("accessing unmapped memory address " + address.toString(16));
-		return this.backbuffer.byteLength;
-	}
+		return unmapped();
 	
 	if (address < 0x1F803000)
 	{
@@ -73,16 +76,12 @@ MemoryMap.prototype.translate = function(address)
 	}
 	
 	if (address < 0x1FC00000)
-	{
-		this.diags.warn("accessing unmapped memory address " + address.toString(16));
-		return this.backbuffer.byteLength;
-	}
+		return unmapped();
 	
 	if (address < 0x1FC80000)
 		return address - 0x1FC00000 + MemoryMap.offsets.bios;
 	
-	this.diags.warn("accessing unmapped memory address " + address.toString(16));
-	return this.backbuffer.byteLength;
+	return unmapped();
 }
 
 MemoryMap.prototype.read8 = function(address)

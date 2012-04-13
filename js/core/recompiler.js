@@ -395,7 +395,7 @@ Recompiler.prototype.recompileBlock = function(memory, address, maxAddress)
 		if (offset != 0)
 			address += " + " + hex(offset);
 		
-		var jsCode = "this.memory.write" + bits + "(" + address + ", " + gpr(value) + ")\n";
+		var jsCode = "this.memory.write" + bits + "(" + address + ", " + gpr(value) + ");\n";
 		jsCode += "this.invalidate(" + address + ");\n";
 		return jsCode;
 	}
@@ -830,9 +830,8 @@ Recompiler.prototype.recompileBlock = function(memory, address, maxAddress)
 		return panic("srav is not implemented");
 	});
 	
-	impl("srl", function() {
-		countUnimplemented.call(this, "srl");
-		return panic("srl is not implemented");
+	impl("srl", function(t, d, i) {
+		return binaryOp(">>>", d, t, i);
 	});
 	
 	impl("srlv", function() {

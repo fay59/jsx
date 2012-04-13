@@ -377,11 +377,11 @@ Disassembler.patternData = {
 	},
 	'sb': {	// store byte
 		pattern: '1010 00ss ssst tttt iiii iiii iiii iiii',
-		format: 'sb {t}, {s}, {i}'
+		format: 'sb {t}, {s}+{i}'
 	},
 	'sh': {	// store halfword
 		pattern: '1010 01ss ssst tttt iiii iiii iiii iiii',
-		format: 'sh {t}, {s}, {i}'
+		format: 'sh {t}, {s}+{i}'
 	},
 	'sll': {	// shift word left logical
 		pattern: '0000 0000 000t tttt dddd diii ii00 0000',
@@ -437,19 +437,19 @@ Disassembler.patternData = {
 	},
 	'sw': {	// store word
 		pattern: '1010 11ss ssst tttt iiii iiii iiii iiii',
-		format: 'sw {t}, {s}, {i}'
+		format: 'sw {t}, {s}+{i}'
 	},
 	'swc2': {	// store word from COP2
 		pattern: '1110 01ss ssst tttt iiii iiii iiii iiii',
-		format: 'swc1 {t}, {s}, {i}'
+		format: 'swc1 {t}, {s}+{i}'
 	},
 	'swl': {	// store word left
 		pattern: '1010 10ss ssst tttt iiii iiii iiii iiii',
-		format: 'swl {t}, {s}, {i}'
+		format: 'swl {t}, {s}+{i}'
 	},
 	'swr': {	// store word right
 		pattern: '1011 10ss ssst tttt iiii iiii iiii iiii',
-		format: 'swr {t}, {s}, {i}'
+		format: 'swr {t}, {s}+{i}'
 	},
 	'syscall': {	// system call
 		pattern: '0000 00ii iiii iiii iiii iiii ii00 1100',
