@@ -5,10 +5,15 @@ document.addEventListener('DOMContentLoaded', function()
 		var reader = new FileReader();
 		reader.onload = function()
 		{
+			var bios = new GeneralPurposeBuffer(reader.result);
+			var hardwareRegisters = new HardwareRegisters();
+			var parallelPort = new ParallelPortMemoryRange();
+			var memory = new MemoryMap(hardwareRegisters, parallelPort, bios);
+			
 			var psx = new R3000a();
-			var memory = new MemoryMap(reader.result);
 			psx.hardwareReset();
 			psx.softwareReset(memory);
+			
 			try
 			{
 				psx.execute(R3000a.bootAddress);

@@ -62,7 +62,7 @@ DisassemblyTable.prototype.reset = function(memory, from, to, pc, onclick)
 
 DisassemblyTable.prototype.disassemble = function(memory, address, onclick)
 {
-	var translatedAddress = memory.translate(address);
+	var translated = memory.translate(address);
 	
 	var bits = memory.read32(address);
 	var op = Disassembler.getOpcode(bits);
@@ -82,7 +82,7 @@ DisassemblyTable.prototype.disassemble = function(memory, address, onclick)
 	
 	if (comment == "nop")
 		tr.classList.add("nop");
-	if (translatedAddress >= memory.invalidAddress)
+	if (translated.buffer == MemoryMap.unmapped)
 		tr.classList.add("invalid");
 	else if (comment !== undefined && (comment[0] == "j" || comment[0] == "b"))
 		tr.classList.add("jump");

@@ -110,8 +110,8 @@ Recompiler.prototype.addLabel = function(label)
 {
 	var labelString = Recompiler.formatHex32(label);
 	// check that the location actually exists
-	var physicalAddress = this.memory.translate(label);
-	if (physicalAddress == this.memory.invalidAddress)
+	var translated = this.memory.translate(label);
+	if (translated.buffer == MemoryMap.unmapped)
 		this.panic("branch or jump to unmapped location " + labelString);
 		
 	// check that the label is not in a delay slot
@@ -146,7 +146,7 @@ Recompiler.prototype.match = function(instruction)
 Recompiler.prototype.nextInstruction = function()
 {
 	var translated = this.memory.translate(this.address);
-	if (translated >= this.memory.invalidAddress)
+	if (translated.buffer == MemoryMap.unmapped)
 		this.panic("accessing invalid memory address " + Recompiler.formatHex32(this.address));
 	
 	var pattern = this.memory.read32(this.address);

@@ -89,12 +89,15 @@ document.addEventListener("DOMContentLoaded", function()
 		diagnostics.log("BIOS » " + Recompiler.formatHex32(dbg.pc));
 	}
 	
-	document.querySelector("#rom-picker").addEventListener("change", function()
+	document.querySelector("#bios-picker").addEventListener("change", function()
 	{
 		var reader = new FileReader();
 		reader.onload = function()
 		{
-			var memory = new MemoryMap(reader.result);
+			var bios = new GeneralPurposeBuffer(reader.result);
+			var hardwareRegisters = new HardwareRegisters();
+			var parallelPort = new ParallelPortMemoryRange();
+			var memory = new MemoryMap(hardwareRegisters, parallelPort, bios);
 			
 			psx.stop();
 			psx.hardwareReset();

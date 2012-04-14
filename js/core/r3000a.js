@@ -120,16 +120,13 @@ R3000a.prototype.execute = function(address)
 {
 	this.stopped = false;
 	
-	// use the physical address to identify the function, but use the
-	// given address to actually compile it
-	var physicalAddress = this.memory.translate(address);
-	if (!(physicalAddress in this.compiled))
+	if (!(address in this.compiled))
 	{
 		var compiled = this.recompiler.recompileFunction(this.memory, address);
-		this.compiled[physicalAddress] = compiled;
+		this.compiled[address] = compiled;
 	}
 	
-	this.compiled[physicalAddress].code.call(this);
+	this.compiled[address].code.call(this);
 }
 
 R3000a.prototype.executeOne = function(address)

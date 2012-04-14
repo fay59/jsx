@@ -24,6 +24,13 @@ document.addEventListener('DOMContentLoaded', function()
 		return;
 	}
 	
+	// check for the endianness
+	if (MemoryMap.endiannes == "big")
+	{
+		fail("Your computer uses a \"big endian\" architecture. JSX currently only works on \"little-endian\" architectures, like Intel computers.");
+		return;
+	}
+	
 	// check for WebGL
 	var screen = document.getElementById("screen");
 	var gl = screen.getContext("webgl");
