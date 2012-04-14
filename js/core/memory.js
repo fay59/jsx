@@ -53,16 +53,33 @@ MemoryMap.writeActions = {
 
 MemoryMap.prototype.isHardwareRegister = function(address)
 {
-	const startAddress = 0x1F801000;
-	const endAddress = startAddress + MemoryMap.regions.registers;
-	return address >= startAddress && address < endAddress;
+	const regStartAddress = 0x1F801000;
+	const regEndAddress = regStartAddress + MemoryMap.regions.registers;
+	const parallelStartAddress = 0x1F000000;
+	const parallelEndAddress = parallelStartAddress +  MemoryMap.regions.parallelPort;
+	return (address >= regStartAddress && address < regEndAddress)
+		|| (address >= parallelStartAddress && address < parallelEndAddress);
 }
 
 MemoryMap.prototype.performHardwareFunctions = function(address, oldValue)
 {
-	var newValue = this.u32[this.translate(address) >>> 2];
-	if (address in MemoryMap.writeActions)
+	const parallelStartAddress = 0x1F000000;
+	const parallelEndAddress = parallelStartAddress +  MemoryMap.regions.parallelPort;
+	if (address >= parallelStartAddress && address < parallelEndAddress)
 	{
+		// revert changes
+		var translated = this.translate(address);
+		this.u32[translated >> 2] = oldValue;
+		
+		switch (address)
+		{
+			case 0x1F020018:
+			case 0x1F020010:
+		}
+	}
+	else if (address in MemoryMap.writeActions)
+	{
+		var newValue = this.u32[this.translate(address) >>> 2];
 		MemoryMap.writeActions[address].call(this, address, oldValue, newValue);
 		return;
 	}

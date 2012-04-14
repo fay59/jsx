@@ -18,6 +18,22 @@ Debugger.prototype._stepCallback = function()
 		this.onstepped.call(this);
 }
 
+Debugger.prototype._parseValue = function(value)
+{
+	value = value.replace(/\s/g, '');
+	if (value.indexOf("0x") == 0)
+	{
+		value = value.substr(2);
+		return parseInt(value, 16);
+	}
+	else if (value.indexOf("0b") == 0)
+	{
+		value = value.substr(2);
+		return parseInt(value, 2);
+	}
+	return parseInt(value);
+}
+
 Debugger.prototype.getGPR = function(index)
 {
 	return "0x" + Recompiler.formatHex32(this.cpu.gpr[index]);
@@ -25,26 +41,7 @@ Debugger.prototype.getGPR = function(index)
 
 Debugger.prototype.setGPR = function(index, value)
 {
-	value = value.replace(/\s/g, '');
-	if (value.indexOf("0x") == 0)
-	{
-		value = value.substr(2);
-		wordLength = 8;
-		base = 16;
-	}
-	else if (value.indexOf("0b") == 0)
-	{
-		value = value.substr(2);
-		wordLength = 32;
-		base = 2;
-	}
-	
-	var hi = 0;
-	var lo = parseInt(value.substr(-wordLength), base);
-	if (value.length > 8)
-		hi = parseInt(value.substr(0, value.length - wordLength), base);
-	
-	this.cpu.gpr[index].set64(hi, lo);
+	this.cpu.gpr[index] = this._parseValue(value);
 }
 
 Debugger.prototype.getCPR = function(index)
@@ -54,19 +51,7 @@ Debugger.prototype.getCPR = function(index)
 
 Debugger.prototype.setCPR = function(index, value)
 {
-	value = value.replace(/\s/g, '');
-	if (value.indexOf("0x") == 0)
-	{
-		value = value.substr(2);
-		base = 16;
-	}
-	else if (value.indexOf("0b") == 0)
-	{
-		value = value.substr(2);
-		base = 2;
-	}
-	
-	this.cop0_reg[index] = parseInt(value, base);
+	this.cpu.gpr[index] = this._parseValue(value);
 }
 
 Debugger.prototype.stepOver = function()
