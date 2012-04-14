@@ -79,6 +79,7 @@ MemoryMap.prototype.translate = function(address)
 	var pageHandler = this.pageMap[address >>> 12];
 	this._translateOutput.buffer = pageHandler;
 	this._translateOutput.offset = address - pageHandler.offset;
+	
 	return this._translateOutput;
 }
 

@@ -206,7 +206,8 @@ Recompiler.prototype.compile = function()
 		var opcodeName = this.opcodes[address].instruction.name;
 		var isJump = opcodeName[0] == 'j' || opcodeName[0] == 'b';
 		
-		if (this.compiledAddresses.indexOf(nextAddress) != -1 || isJump)
+		// don't add a clock call on the first instruction
+		if ((this.compiledAddresses.indexOf(nextAddress) != -1 || isJump) && i != 0)
 		{
 			jsCode += "this.clock(" + (nextAddress - lastKey) + ");\n\n";
 			lastKey = nextAddress;
@@ -453,9 +454,8 @@ Recompiler.prototype.recompileBlock = function(memory, address, maxAddress)
 		return binaryOp("+", s, d, t);
 	});
 	
-	impl("and", function() {
-		countUnimplemented.call(this, "and");
-		return panic("and is not implemented");
+	impl("and", function(s, t, d) {
+		return binaryOp("&", s, d, t);
 	});
 	
 	impl("andi", function(s, t, i) {
@@ -501,9 +501,8 @@ Recompiler.prototype.recompileBlock = function(memory, address, maxAddress)
 		return panic("blez is not implemented");
 	});
 	
-	impl("bltz", function() {
-		countUnimplemented.call(this, "bltz");
-		return panic("bltz is not implemented");
+	impl("bltz", function(s, i) {
+		return branch.call(this, gpr(s) + " < 0", i);
 	});
 	
 	impl("bltzal", function() {
@@ -662,9 +661,8 @@ Recompiler.prototype.recompileBlock = function(memory, address, maxAddress)
 		return panic("lwr is not implemented");
 	});
 	
-	impl("mfc0", function() {
-		countUnimplemented.call(this, "mfc0");
-		return panic("mfc0 is not implemented");
+	impl("mfc0", function(t, d) { // t is the cop0 reg, d is the gpr
+		return gpr(d) + " = this.cop0_reg[" + t + "];\n";
 	});
 	
 	impl("mfc2", function() {

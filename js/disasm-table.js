@@ -22,11 +22,12 @@ DisassemblyTable.prototype.select = function(pc)
 DisassemblyTable.prototype.expandTop = function(memory, from, onclick)
 {
 	from -= from % 4;
+	var oldFirstRow = this.table.firstChild;
 	for (var i = from; i < this.fromAddress; i += 4)
 	{
 		this.rows[i] = this.disassemble(memory, i, onclick);
 		this.rows[i].classList.add("before");
-		this.table.insertBefore(this.rows[i], this.table.firstChild);
+		this.table.insertBefore(this.rows[i], oldFirstRow);
 	}
 	this.fromAddress = from;
 }
