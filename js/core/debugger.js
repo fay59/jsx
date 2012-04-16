@@ -205,6 +205,12 @@ Debugger.prototype.run = function()
 			this.pc = ex.address;
 			this._stepCallback(this.onstepped);
 		}
+		else if (ex.constructor == ExecutionException)
+		{
+			this.diags.error(ex.cause ? ex.cause.message : ex.message);
+			this.pc = ex.pc;
+			this._stepCallback(this.onstepped);
+		}
 		else
 		{
 			this.diags.error(ex.message);

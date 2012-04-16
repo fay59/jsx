@@ -1,4 +1,4 @@
-Recompiler = function()
+var Recompiler = function()
 {
 	this.memory = null;
 	this.code = {};
@@ -212,7 +212,7 @@ Recompiler.prototype.compile = function()
 		jsCode += this.code[address] + "\n";
 	}
 	
-	jsCode += "default: this.panic('unreferenced block 0x' + Recompiler.formatHex(pc)); break;\n";
+	jsCode += "default: this.panic('unreferenced block 0x' + Recompiler.formatHex(pc), pc); break;\n";
 	jsCode += "}\n}";
 	
 	var functionName = "." + Recompiler.formatHex(this.startAddress);
@@ -338,9 +338,9 @@ Recompiler.formatHex = function(address, length)
 		return "0x" + Recompiler.formatHex(x);
 	}
 	
-	function panic(message)
+	function panic(message, pc)
 	{
-		return "this.panic('" + message + "');\n";
+		return "this.panic('" + message + "', " + pc + ");\n";
 	}
 	
 	function binaryOp(op, dest, source, value)
@@ -355,7 +355,7 @@ Recompiler.formatHex = function(address, length)
 		return gpr(dest) + " = " + gpr(source) + " " + op + " " + value + ";\n";
 	}
 	
-	function binaryOpTrap(op, dest, source, value)
+	function binaryOpTrap(address, op, dest, source, value)
 	{
 		if (op === undefined || dest === undefined || source === undefined || value === undefined)
 			this.panic("undefined argument");
@@ -364,7 +364,7 @@ Recompiler.formatHex = function(address, length)
 		var jsCode = "overflowChecked = " + gpr(source) + " " + op + " " + value + ";\n";
 		jsCode += "if (overflowChecked > 0xFFFFFFFF || overflowChecked < -0x80000000)\n";
 		// TODO implement overflow exceptions
-		jsCode += "\tthis.panic('time to implement exceptions');\n";
+		jsCode += "\tthis.panic('time to implement exceptions', " + address + ");\n";
 		jsCode += gpr(dest) + " = overflowChecked;\n";
 		return jsCode;
 	}
@@ -400,7 +400,7 @@ Recompiler.formatHex = function(address, length)
 	{
 		var delaySlot = this.nextInstruction();
 		if (delaySlot.instruction.name[0] == 'b' || delaySlot.instruction.name[0] == 'j')
-			return "this.panic('branch in delay slot is undefined behavior');\n";
+			return "this.panic('branch in delay slot is undefined behavior', " + (this.address - 4) + ");\n";
 		var jsCode = "// delay slot: " + Disassembler.getOpcodeAsString(delaySlot) + "\n";
 		jsCode += this[delaySlot.instruction.name].apply(this, delaySlot.params);
 		return jsCode;
@@ -434,11 +434,11 @@ Recompiler.formatHex = function(address, length)
 	
 	impl("add", function() {
 		countUnimplemented.call(this, "add");
-		return panic("add is not implemented");
+		return panic("add is not implemented", this.address - 4);
 	});
 	
 	impl("addi", function(s, t, i) {
-		return binaryOpTrap("+", t, s, signExt(i, 16));
+		return binaryOpTrap(this.address - 4, "+", t, s, signExt(i, 16));
 	});
 	
 	impl("addiu", function(s, t, i) {
@@ -459,12 +459,12 @@ Recompiler.formatHex = function(address, length)
 	
 	impl("avsz3", function() {
 		countUnimplemented.call(this, "avsz3");
-		return panic("avsz3 is not implemented");
+		return panic("avsz3 is not implemented", this.address - 4);
 	});
 	
 	impl("avsz4", function() {
 		countUnimplemented.call(this, "avsz4");
-		return panic("avsz4 is not implemented");
+		return panic("avsz4 is not implemented", this.address - 4);
 	});
 	
 	impl("beq", function(s, t, i) {
@@ -473,27 +473,27 @@ Recompiler.formatHex = function(address, length)
 	
 	impl("beql", function() {
 		countUnimplemented.call(this, "beql");
-		return panic("beql is not implemented");
+		return panic("beql is not implemented", this.address - 4);
 	});
 	
 	impl("bgez", function() {
 		countUnimplemented.call(this, "bgez");
-		return panic("bgez is not implemented");
+		return panic("bgez is not implemented", this.address - 4);
 	});
 	
 	impl("bgezal", function() {
 		countUnimplemented.call(this, "bgezal");
-		return panic("bgezal is not implemented");
+		return panic("bgezal is not implemented", this.address - 4);
 	});
 	
 	impl("bgtz", function() {
 		countUnimplemented.call(this, "bgtz");
-		return panic("bgtz is not implemented");
+		return panic("bgtz is not implemented", this.address - 4);
 	});
 	
 	impl("blez", function() {
 		countUnimplemented.call(this, "blez");
-		return panic("blez is not implemented");
+		return panic("blez is not implemented", this.address - 4);
 	});
 	
 	impl("bltz", function(s, i) {
@@ -502,7 +502,7 @@ Recompiler.formatHex = function(address, length)
 	
 	impl("bltzal", function() {
 		countUnimplemented.call(this, "bltzal");
-		return panic("bltzal is not implemented");
+		return panic("bltzal is not implemented", this.address - 4);
 	});
 	
 	impl("bne", function(s, t, i) {
@@ -511,77 +511,77 @@ Recompiler.formatHex = function(address, length)
 	
 	impl("break", function() {
 		countUnimplemented.call(this, "break");
-		return panic("break is not implemented");
+		return panic("break is not implemented", this.address - 4);
 	});
 	
 	impl("cc", function() {
 		countUnimplemented.call(this, "cc");
-		return panic("cc is not implemented");
+		return panic("cc is not implemented", this.address - 4);
 	});
 	
 	impl("cdp", function() {
 		countUnimplemented.call(this, "cdp");
-		return panic("cdp is not implemented");
+		return panic("cdp is not implemented", this.address - 4);
 	});
 	
 	impl("cfc0", function() {
 		countUnimplemented.call(this, "cfc0");
-		return panic("cfc0 is not implemented");
+		return panic("cfc0 is not implemented", this.address - 4);
 	});
 	
 	impl("cfc2", function() {
 		countUnimplemented.call(this, "cfc2");
-		return panic("cfc2 is not implemented");
+		return panic("cfc2 is not implemented", this.address - 4);
 	});
 	
 	impl("ctc0", function() {
 		countUnimplemented.call(this, "ctc0");
-		return panic("ctc0 is not implemented");
+		return panic("ctc0 is not implemented", this.address - 4);
 	});
 	
 	impl("ctc2", function() {
 		countUnimplemented.call(this, "ctc2");
-		return panic("ctc2 is not implemented");
+		return panic("ctc2 is not implemented", this.address - 4);
 	});
 	
 	impl("dpcl", function() {
 		countUnimplemented.call(this, "dpcl");
-		return panic("dpcl is not implemented");
+		return panic("dpcl is not implemented", this.address - 4);
 	});
 	
 	impl("div", function() {
 		countUnimplemented.call(this, "div");
-		return panic("div is not implemented");
+		return panic("div is not implemented", this.address - 4);
 	});
 	
 	impl("divu", function() {
 		countUnimplemented.call(this, "divu");
-		return panic("divu is not implemented");
+		return panic("divu is not implemented", this.address - 4);
 	});
 	
 	impl("dpcs", function() {
 		countUnimplemented.call(this, "dpcs");
-		return panic("dpcs is not implemented");
+		return panic("dpcs is not implemented", this.address - 4);
 	});
 	
 	impl("dpct", function() {
 		countUnimplemented.call(this, "dpct");
-		return panic("dpct is not implemented");
+		return panic("dpct is not implemented", this.address - 4);
 	});
 	
 	impl("gpf", function() {
 		countUnimplemented.call(this, "gpf");
-		return panic("gpf is not implemented");
+		return panic("gpf is not implemented", this.address - 4);
 	});
 	
 	impl("gpl", function() {
 		countUnimplemented.call(this, "gpl");
-		return panic("gpl is not implemented");
+		return panic("gpl is not implemented", this.address - 4);
 	});
 	
 	impl("intpl", function() {
 		countUnimplemented.call(this, "intpl");
-		return panic("intpl is not implemented");
+		return panic("intpl is not implemented", this.address - 4);
 	});
 	
 	impl("j", function(i) {
@@ -624,17 +624,17 @@ Recompiler.formatHex = function(address, length)
 	
 	impl("lbu", function() {
 		countUnimplemented.call(this, "lbu");
-		return panic("lbu is not implemented");
+		return panic("lbu is not implemented", this.address - 4);
 	});
 	
 	impl("lh", function() {
 		countUnimplemented.call(this, "lh");
-		return panic("lh is not implemented");
+		return panic("lh is not implemented", this.address - 4);
 	});
 	
 	impl("lhu", function() {
 		countUnimplemented.call(this, "lhu");
-		return panic("lhu is not implemented");
+		return panic("lhu is not implemented", this.address - 4);
 	});
 	
 	impl("lui", function(t, i) {
@@ -647,17 +647,17 @@ Recompiler.formatHex = function(address, length)
 	
 	impl("lwc2", function() {
 		countUnimplemented.call(this, "lwc2");
-		return panic("lwc2 is not implemented");
+		return panic("lwc2 is not implemented", this.address - 4);
 	});
 	
 	impl("lwl", function() {
 		countUnimplemented.call(this, "lwl");
-		return panic("lwl is not implemented");
+		return panic("lwl is not implemented", this.address - 4);
 	});
 	
 	impl("lwr", function() {
 		countUnimplemented.call(this, "lwr");
-		return panic("lwr is not implemented");
+		return panic("lwr is not implemented", this.address - 4);
 	});
 	
 	impl("mfc0", function(t, d) { // t is the cop0 reg, d is the gpr
@@ -666,17 +666,17 @@ Recompiler.formatHex = function(address, length)
 	
 	impl("mfc2", function() {
 		countUnimplemented.call(this, "mfc2");
-		return panic("mfc2 is not implemented");
+		return panic("mfc2 is not implemented", this.address - 4);
 	});
 	
 	impl("mfhi", function() {
 		countUnimplemented.call(this, "mfhi");
-		return panic("mfhi is not implemented");
+		return panic("mfhi is not implemented", this.address - 4);
 	});
 	
 	impl("mflo", function() {
 		countUnimplemented.call(this, "mflo");
-		return panic("mflo is not implemented");
+		return panic("mflo is not implemented", this.address - 4);
 	});
 	
 	impl("mtc0", function(t, l) {
@@ -685,72 +685,72 @@ Recompiler.formatHex = function(address, length)
 	
 	impl("mtc2", function() {
 		countUnimplemented.call(this, "mtc2");
-		return panic("mtc2 is not implemented");
+		return panic("mtc2 is not implemented", this.address - 4);
 	});
 	
 	impl("mthi", function() {
 		countUnimplemented.call(this, "mthi");
-		return panic("mthi is not implemented");
+		return panic("mthi is not implemented", this.address - 4);
 	});
 	
 	impl("mtlo", function() {
 		countUnimplemented.call(this, "mtlo");
-		return panic("mtlo is not implemented");
+		return panic("mtlo is not implemented", this.address - 4);
 	});
 	
 	impl("mult", function() {
 		countUnimplemented.call(this, "mult");
-		return panic("mult is not implemented");
+		return panic("mult is not implemented", this.address - 4);
 	});
 	
 	impl("multu", function() {
 		countUnimplemented.call(this, "multu");
-		return panic("multu is not implemented");
+		return panic("multu is not implemented", this.address - 4);
 	});
 	
 	impl("mvmva", function() {
 		countUnimplemented.call(this, "mvmva");
-		return panic("mvmva is not implemented");
+		return panic("mvmva is not implemented", this.address - 4);
 	});
 	
 	impl("nccs", function() {
 		countUnimplemented.call(this, "nccs");
-		return panic("nccs is not implemented");
+		return panic("nccs is not implemented", this.address - 4);
 	});
 	
 	impl("ncct", function() {
 		countUnimplemented.call(this, "ncct");
-		return panic("ncct is not implemented");
+		return panic("ncct is not implemented", this.address - 4);
 	});
 	
 	impl("ncds", function() {
 		countUnimplemented.call(this, "ncds");
-		return panic("ncds is not implemented");
+		return panic("ncds is not implemented", this.address - 4);
 	});
 	
 	impl("ncdt", function() {
 		countUnimplemented.call(this, "ncdt");
-		return panic("ncdt is not implemented");
+		return panic("ncdt is not implemented", this.address - 4);
 	});
 	
 	impl("nclip", function() {
 		countUnimplemented.call(this, "nclip");
-		return panic("nclip is not implemented");
+		return panic("nclip is not implemented", this.address - 4);
 	});
 	
 	impl("ncs", function() {
 		countUnimplemented.call(this, "ncs");
-		return panic("ncs is not implemented");
+		return panic("ncs is not implemented", this.address - 4);
 	});
 	
 	impl("nct", function() {
 		countUnimplemented.call(this, "nct");
-		return panic("nct is not implemented");
+		return panic("nct is not implemented", this.address - 4);
 	});
 	
 	impl("nor", function() {
 		countUnimplemented.call(this, "nor");
-		return panic("nor is not implemented");
+		return panic("nor is not implemented", this.address - 4);
 	});
 	
 	impl("or", function(s, t, d) {
@@ -763,17 +763,17 @@ Recompiler.formatHex = function(address, length)
 	
 	impl("rfe", function() {
 		countUnimplemented.call(this, "rfe");
-		return panic("rfe is not implemented");
+		return panic("rfe is not implemented", this.address - 4);
 	});
 	
 	impl("rtps", function() {
 		countUnimplemented.call(this, "rtps");
-		return panic("rtps is not implemented");
+		return panic("rtps is not implemented", this.address - 4);
 	});
 	
 	impl("rtpt", function() {
 		countUnimplemented.call(this, "rtpt");
-		return panic("rtpt is not implemented");
+		return panic("rtpt is not implemented", this.address - 4);
 	});
 	
 	impl("sb", function(s, t, i) {
@@ -790,22 +790,22 @@ Recompiler.formatHex = function(address, length)
 	
 	impl("sllv", function() {
 		countUnimplemented.call(this, "sllv");
-		return panic("sllv is not implemented");
+		return panic("sllv is not implemented", this.address - 4);
 	});
 	
 	impl("slt", function() {
 		countUnimplemented.call(this, "slt");
-		return panic("slt is not implemented");
+		return panic("slt is not implemented", this.address - 4);
 	});
 	
 	impl("slti", function() {
 		countUnimplemented.call(this, "slti");
-		return panic("slti is not implemented");
+		return panic("slti is not implemented", this.address - 4);
 	});
 	
 	impl("sltiu", function() {
 		countUnimplemented.call(this, "sltiu");
-		return panic("sltiu is not implemented");
+		return panic("sltiu is not implemented", this.address - 4);
 	});
 	
 	impl("sltu", function(s, t, d) {
@@ -814,12 +814,12 @@ Recompiler.formatHex = function(address, length)
 	
 	impl("sqr", function() {
 		countUnimplemented.call(this, "sqr");
-		return panic("sqr is not implemented");
+		return panic("sqr is not implemented", this.address - 4);
 	});
 	
 	impl("sra", function() {
 		countUnimplemented.call(this, "sra");
-		return panic("sra is not implemented");
+		return panic("sra is not implemented", this.address - 4);
 	});
 	
 	impl("srav", function(s, t, d) {
@@ -832,17 +832,17 @@ Recompiler.formatHex = function(address, length)
 	
 	impl("srlv", function() {
 		countUnimplemented.call(this, "srlv");
-		return panic("srlv is not implemented");
+		return panic("srlv is not implemented", this.address - 4);
 	});
 	
 	impl("sub", function() {
 		countUnimplemented.call(this, "sub");
-		return panic("sub is not implemented");
+		return panic("sub is not implemented", this.address - 4);
 	});
 	
 	impl("subu", function() {
 		countUnimplemented.call(this, "subu");
-		return panic("subu is not implemented");
+		return panic("subu is not implemented", this.address - 4);
 	});
 	
 	impl("sw", function(s, t, i) {
@@ -851,31 +851,31 @@ Recompiler.formatHex = function(address, length)
 	
 	impl("swc2", function() {
 		countUnimplemented.call(this, "swc2");
-		return panic("swc2 is not implemented");
+		return panic("swc2 is not implemented", this.address - 4);
 	});
 	
 	impl("swl", function() {
 		countUnimplemented.call(this, "swl");
-		return panic("swl is not implemented");
+		return panic("swl is not implemented", this.address - 4);
 	});
 	
 	impl("swr", function() {
 		countUnimplemented.call(this, "swr");
-		return panic("swr is not implemented");
+		return panic("swr is not implemented", this.address - 4);
 	});
 	
 	impl("syscall", function() {
 		countUnimplemented.call(this, "syscall");
-		return panic("syscall is not implemented");
+		return panic("syscall is not implemented", this.address - 4);
 	});
 	
 	impl("xor", function() {
 		countUnimplemented.call(this, "xor");
-		return panic("xor is not implemented");
+		return panic("xor is not implemented", this.address - 4);
 	});
 	
 	impl("xori", function() {
 		countUnimplemented.call(this, "xori");
-		return panic("xori is not implemented");
+		return panic("xori is not implemented", this.address - 4);
 	});
 })();

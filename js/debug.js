@@ -15,6 +15,7 @@ document.addEventListener("DOMContentLoaded", function()
 	var goToButton = document.querySelector("#goto");
 	var disasmContainer = document.querySelector("#disasm-container");
 	var breakpoints = document.querySelector("#breakpoints");
+	var addBreakpointButton = document.querySelector("#add-breakpoint");
 	
 	var stack = document.querySelector("#stack");
 	stack.addEventListener("change", function()
@@ -58,25 +59,30 @@ document.addEventListener("DOMContentLoaded", function()
 		}
 	}
 	
+	function addBreakpoint(address)
+	{
+		var hexAddress = Recompiler.formatHex(address);
+		dbg.setBreakpoint(address);
+		var li = document.createElement('li');
+		li.setAttribute('data-address', address);
+		li.textContent = " " + hexAddress;
+		var del = document.createElement('span');
+		del.textContent = '[-]';
+		del.addEventListener("click", function() {
+			dbg.removeBreakpoint(address);
+			breakpoints.removeChild(li);
+		});
+		li.insertBefore(del, li.firstChild);
+		breakpoints.appendChild(li);
+	}
+	
 	function toggleBreakpoint()
 	{
 		var self = this;
 		var address = parseInt(this.textContent, 16);
 		if (dbg.breakpoints.indexOf(address) == -1)
 		{
-			dbg.setBreakpoint(address);
-			
-			var li = document.createElement('li');
-			li.setAttribute('data-address', address);
-			li.textContent = " " + this.textContent;
-			var del = document.createElement('span');
-			del.textContent = '[-]';
-			del.addEventListener("click", function() {
-				dbg.removeBreakpoint(address);
-				breakpoints.removeChild(li);
-			});
-			li.insertBefore(del, li.firstChild);
-			breakpoints.appendChild(li);
+			addBreakpoint(address);
 		}
 		else
 		{
@@ -290,6 +296,15 @@ document.addEventListener("DOMContentLoaded", function()
 	stepOutButton.addEventListener("click", stepOut);
 	pauseButton.addEventListener("click", pause);
 	goToButton.addEventListener("click", goTo);
+	
+	addBreakpointButton.addEventListener("click", function()
+	{
+		var address = prompt("Breakpoint address (hex):");
+		if (address == null) return;
+		
+		var intAddress = parseInt(address, 16);
+		addBreakpoint(intAddress);
+	});
 	
 	document.addEventListener("keydown", function(e)
 	{

@@ -26,6 +26,8 @@ input {
 #breakpoints {
 	list-style-type: none;
 	padding: 0px;
+	display: block;
+	overflow: auto;
 }
 
 #utils > div {

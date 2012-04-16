@@ -1,12 +1,13 @@
-var YieldControl = function(resumeFunctionAddress, resumePC)
+var ExecutionException = function(message, pc, cause)
 {
-	if (!isFinite(resumeFunctionAddress) || !isFinite(resumePC))
-		throw new Error("non-numeric resume address");
-	
-	this.resumeFunctionAddress = resumeFunctionAddress;
-	this.resumePC = resumePC;
-	this.message = "resume execution at 0x" + resumeFunctionAddress.toString(16)
-		+ "(" + resumePC.toString(16) + ")";
+	this.message = message;
+	this.pc = pc;
+	this.cause = cause;
+}
+
+ExecutionException.prototype.toString = function()
+{
+	return this.message;
 }
 
 var R3000a = function()
@@ -59,10 +60,10 @@ R3000a.prototype.setDiagnosticsOutput = function(diags)
 		this.memory.diags = diags;
 }
 
-R3000a.prototype.panic = function(message)
+R3000a.prototype.panic = function(message, pc)
 {
 	this.stopped = true;
-	throw new Error(message);
+	throw new ExecutionException(message, pc);
 }
 
 // used from the WebKit debugger when something goes terribly wrong
@@ -122,8 +123,15 @@ R3000a.prototype.execute = function(address, context)
 	
 	if (!(address in this.compiled))
 	{
-		var compiled = this.recompiler.recompileFunction(this.memory, address, context);
-		this.compiled[address] = compiled;
+		try
+		{
+			var compiled = this.recompiler.recompileFunction(this.memory, address, context);
+			this.compiled[address] = compiled;
+		}
+		catch (e)
+		{
+			throw new ExecutionException("A recompilation exception prevented the program from continuing", address, e);
+		}
 	}
 	
 	this.compiled[address].code.call(this);
@@ -133,11 +141,6 @@ R3000a.prototype.executeOne = function(address, context)
 {
 	var func = this.recompiler.recompileOne(this.memory, address, context);
 	return func.call(this);
-}
-
-R3000a.prototype.executeUntilBranchOrAddress = function(address, destAddress, context)
-{
-	return this.recompiler.recompileBlock(this.memory, address, destAddress).call(this, context);
 }
 
 // ugly linear search
