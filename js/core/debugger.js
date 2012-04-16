@@ -115,7 +115,14 @@ Debugger.prototype.stepOver = function()
 	}
 	else
 	{
-		this.pc = this.cpu.executeOne(this.pc);
+		try
+		{
+			this.pc = this.cpu.executeOne(this.pc);
+		}
+		catch (ex)
+		{
+			this._handleException(ex);
+		}
 	}
 	this._stepCallback(this.onstepped);
 }
@@ -177,18 +184,7 @@ Debugger.prototype.runUntil = function(desiredPC)
 	}
 	catch (ex)
 	{
-		if (ex.constructor == Breakpoint)
-		{
-			this.pc = ex.address;
-			this.breakpoints.pop();
-			this.cpu.invalidate(desiredPC);
-			
-			this._stepCallback(this.onstepped);
-		}
-		else
-		{
-			this.diags.error(ex.message);
-		}
+		this._handleException(ex);
 	}
 }
 
@@ -200,21 +196,7 @@ Debugger.prototype.run = function()
 	}
 	catch (ex)
 	{
-		if (ex.constructor == Breakpoint)
-		{
-			this.pc = ex.address;
-			this._stepCallback(this.onstepped);
-		}
-		else if (ex.constructor == ExecutionException)
-		{
-			this.diags.error(ex.cause ? ex.cause.message : ex.message);
-			this.pc = ex.pc;
-			this._stepCallback(this.onstepped);
-		}
-		else
-		{
-			this.diags.error(ex.message);
-		}
+		this._handleException(ex);
 	}
 }
 
@@ -224,6 +206,26 @@ Debugger.prototype.updateTrace = function()
 	var op = Disassembler.getOpcode(bits);
 	var string = Disassembler.getOpcodeAsString(op);
 	this.trace.push([this.pc, string, this.cpu.registerMemory.slice(0)]);
+}
+
+Debugger.prototype._handleException = function(ex)
+{
+	if (ex.constructor == Breakpoint)
+	{
+		this.pc = ex.address;
+		this.diags.log("stopped at " + this.pc);
+		this._stepCallback(this.onstepped);
+	}
+	else if (ex.constructor == ExecutionException)
+	{
+		this.diags.error(ex.cause ? ex.cause.message : ex.message);
+		this.pc = ex.pc;
+		this._stepCallback(this.onstepped);
+	}
+	else
+	{
+		this.diags.error(ex.message);
+	}
 }
 
 Debugger.prototype._stepCallback = function(fn)
