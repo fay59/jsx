@@ -244,8 +244,9 @@ Recompiler.prototype.recompileOne = function(memory, address)
 		+ this.recompileOpcode(address, op)
 		+ "} while (false);\n";
 	
-	// account for the delay slot, it needs to be skipped
-	if (op.instruction.name[0] == 'b' || op.instruction.name[0] == 'j')
+	// account for the delay slot, it needs to be skipped in the case of a
+	// branch or call (but NOT in the case of a jump!)
+	if (op.instruction.name[0] == 'b' || op.instruction.name == 'jal' || op.instruction.name == 'jalr')
 		code += "pc += 4;\n";
 	
 	code += "return pc;\n";
