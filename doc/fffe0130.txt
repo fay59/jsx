@@ -1,0 +1,23 @@
+From http://pcsx2.googlecode.com/svn/branches/R3000air/ps2/Iop/IopMemory.cpp:
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// BIU/Cache config register [0xfffe0130]
+// "Where's it goin' to?  And what does it think it's gonna do when it gets there?" - air
+//
+// ** RES    : 31 -> 18 : Reserved
+// ** RES    : 17       : Reserved (should be 1 for normal operation)
+// ** RES    : 16       : Reserved (should be 0 for normal operation)
+// ** BGNT   : 15       : Enables Bus Grant
+// ** NOPAD  : 14       : No padding of waitstates between transactions
+// ** RDPRI  : 13       : Loads have priority over stores
+// ** INTP   : 12       : Interrupts are active high
+// ** IS1    : 11       : Enable I-Cache
+// ** IS0    : 10       : Hardwired to zero
+// ** IBLKSZ :  9 ->  8 : I-Cache refill size = 8 words (certain values may cause bus error?)
+// ** DS     :  7       : Enable D-Cache / Scratchpad
+// ** RES    :  6       : Hardwired to zero
+// ** DBLKSZ :  5 ->  4 : D-Cache refill block size 8 words
+// ** RAM    :  3       : No Scratchpad RAM (when disabled, accesses to scratchpad cause Bus Error)
+// ** TAG    :  2       : Disable tag test
+// ** INV    :  1       : Disable invalidate mode
+// ** LOCK   :  0       : Disable cache lock

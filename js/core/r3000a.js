@@ -116,28 +116,28 @@ R3000a.prototype.clock = function(ticks)
 	// TODO timer
 }
 
-R3000a.prototype.execute = function(address)
+R3000a.prototype.execute = function(address, context)
 {
 	this.stopped = false;
 	
 	if (!(address in this.compiled))
 	{
-		var compiled = this.recompiler.recompileFunction(this.memory, address);
+		var compiled = this.recompiler.recompileFunction(this.memory, address, context);
 		this.compiled[address] = compiled;
 	}
 	
 	this.compiled[address].code.call(this);
 }
 
-R3000a.prototype.executeOne = function(address)
+R3000a.prototype.executeOne = function(address, context)
 {
-	var func = this.recompiler.recompileOne(this.memory, address);
+	var func = this.recompiler.recompileOne(this.memory, address, context);
 	return func.call(this);
 }
 
-R3000a.prototype.executeUntilBranchOrAddress = function(address, destAddress)
+R3000a.prototype.executeUntilBranchOrAddress = function(address, destAddress, context)
 {
-	return this.recompiler.recompileBlock(this.memory, address, destAddress).call(this);
+	return this.recompiler.recompileBlock(this.memory, address, destAddress).call(this, context);
 }
 
 // ugly linear search

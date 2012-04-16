@@ -57,15 +57,15 @@ MemoryMap.unmapped = {
 	
 	get offset() { return 0; },
 	get u8() {
-		console.warn("reading unmapped memory--set a breakpoint in memory.js to debug");
+		console.warn("accessing unmapped memory--set a breakpoint in memory.js to debug");
 		return this.u8Array;
 	},
 	get u16() {
-		console.warn("reading unmapped memory--set a breakpoint in memory.js to debug");
+		console.warn("accessing unmapped memory--set a breakpoint in memory.js to debug");
 		return this.u16Array;
 	},
 	get u32() {
-		console.warn("reading unmapped memory--set a breakpoint in memory.js to debug");
+		console.warn("accessing unmapped memory--set a breakpoint in memory.js to debug");
 		return this.u32Array;
 	}
 };

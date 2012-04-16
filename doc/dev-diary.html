@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>JSX development diary</title>
+</head>
+<body>
+<p>The funniest thing about writing an emulator for the PSX is that the
+	emulation community essentially died around 2005. You read through mailing
+	lists no less than a decade old, full of links to weird .ru websites, of which
+	none remains. Without <a href="//archive.org">Internet Archive's Wayback
+	Machine</a>, I clearly would not have succeeded. It's incredible the amount
+	of information that has disappeared from the Net in just a few years.</p>
+<p>This project actually started off as a Nintendo 64 emulator. Emulating a N64
+	has a few cool aspects:</p>
+<ul>
+	<li>N64 emulators, as I know them, do not require a BIOS;</li>
+	<li>The MIPS processor is easy to implement;</li>
+	<li>It's probably feasible performance-wise as the first N64 emulator, UltraHLE,
+		spawned in January 1999 and was able to run a few games to full speed.</li>
+</ul>
+<p>But then it dawned on me that most of it was not as fun as it looked.</p>
+<ul>
+	<li>N64 emulators don't require a BIOS, but the startup operations are,
+		at best, obscure incantations;</li>
+	<li>The MIPS processor is a 64-bit processor with a FPU, and Javascript
+		doesn't have 64-bit integers and only one type of floating-point number;</li>
+	<li>The N64 emulator has three processors;
+	<li>The video memory is not isolated from the main memory, making it a pain
+		to use with WebGL.</li>
+</ul>
+<p>So instead, I decided to fall back to the PlayStation, that has just one
+	CPU (an earlier MIPS processor even, so a lot of work wasn't lost), with 32-bit
+	registers, no FPU, and isolated video memory.</p>
+</ul>
+</body>
+</html>

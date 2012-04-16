@@ -43,7 +43,7 @@ DisassemblyTable.prototype.expandBottom = function(memory, to, onclick)
 	this.toAddress = to;
 }
 
-DisassemblyTable.prototype.reset = function(memory, from, to, pc, onclick)
+DisassemblyTable.prototype.reset = function(memory, from, to, pc, gotoHandler, bpHandler)
 {
 	this.rows = {};
 	this.fromAddress = from - from % 4;
@@ -54,14 +54,14 @@ DisassemblyTable.prototype.reset = function(memory, from, to, pc, onclick)
 	
 	for (var i = this.fromAddress; i != this.toAddress; i += 4)
 	{
-		this.rows[i] = this.disassemble(memory, i, onclick);
+		this.rows[i] = this.disassemble(memory, i, gotoHandler, bpHandler);
 		if (i < pc) this.rows[i].classList.add("before");
 		else if (i > pc) this.rows[i].classList.add("after");
 		this.table.appendChild(this.rows[i]);
 	}
 }
 
-DisassemblyTable.prototype.disassemble = function(memory, address, onclick)
+DisassemblyTable.prototype.disassemble = function(memory, address, gotoHandler, bpHandler)
 {
 	var translated = memory.translate(address);
 	
@@ -75,11 +75,12 @@ DisassemblyTable.prototype.disassemble = function(memory, address, onclick)
 	var instrTD = document.createElement("td");
 	
 	actionTD.textContent = "→";
-	addressTD.textContent = Recompiler.formatHex32(address);
+	addressTD.textContent = Recompiler.formatHex(address);
 	instrTD.textContent = comment;
 	
 	actionTD.style.cursor = "pointer";
-	actionTD.addEventListener("click", onclick);
+	actionTD.addEventListener("click", gotoHandler);
+	addressTD.addEventListener("click", bpHandler);
 	
 	if (comment == "nop")
 		tr.classList.add("nop");

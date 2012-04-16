@@ -7,30 +7,82 @@ document.addEventListener("DOMContentLoaded", function()
 	var psx = new R3000a();
 	var dbg = new Debugger(psx);
 	
+	var runButton = document.querySelector("#run");
 	var stepOverButton = document.querySelector("#step-over");
 	var stepIntoButton = document.querySelector("#step-into");
+	var stepOutButton = document.querySelector("#step-out");
 	var pauseButton = document.querySelector("#pause");
 	var goToButton = document.querySelector("#goto");
 	var disasmContainer = document.querySelector("#disasm-container");
+	var breakpoints = document.querySelector("#breakpoints");
+	
+	var stack = document.querySelector("#stack");
+	stack.addEventListener("change", function()
+	{
+		var option = this.selectedOptions[0];
+		var address = parseInt(this.value.substr(2), 16);
+		disasm.reset(psx.memory, address - 8, address + 0x80, address, runPC, toggleBreakpoint);
+	});
+	
+	function refreshStack()
+	{
+		while (stack.childNodes.length)
+			stack.removeChild(stack.firstChild);
 		
+		for (var i = 0; i < dbg.stack.length; i++)
+		{
+			var option = document.createElement('option');
+			option.textContent = i + ": " + Recompiler.formatHex(dbg.stack[i]);
+			stack.insertBefore(option, stack.firstChild);
+		}
+		
+		var option = document.createElement('option');
+		option.textContent = dbg.stack.length + ": " + Recompiler.formatHex(dbg.pc);
+		stack.insertBefore(option, stack.firstChild);
+	}
+	
 	function runPC()
 	{
 		var pc = parseInt(this.parentNode.childNodes[1].textContent, 16);
 		if (event.altKey)
 		{
-			diagnostics.log("setting PC to " + Recompiler.formatHex32(pc));
+			diagnostics.log("setting PC to " + Recompiler.formatHex(pc));
 			dbg.pc = pc;
-			runHandle.interrupt();
 			pauseButton.disabled = true;
 			disasm.select(pc);
 		}
 		else if (pc > dbg.pc)
 		{
-			diagnostics.log("running to " + Recompiler.formatHex32(pc));
-			runHandle = dbg.runUntil(pc);
-			pauseButton.disabled = false;
-			stepOverButton.disabled = true;
-			stepIntoButton.disabled = true;
+			diagnostics.log("running to " + Recompiler.formatHex(pc));
+			dbg.runUntil(pc);
+		}
+	}
+	
+	function toggleBreakpoint()
+	{
+		var self = this;
+		var address = parseInt(this.textContent, 16);
+		if (dbg.breakpoints.indexOf(address) == -1)
+		{
+			dbg.setBreakpoint(address);
+			
+			var li = document.createElement('li');
+			li.setAttribute('data-address', address);
+			li.textContent = " " + this.textContent;
+			var del = document.createElement('span');
+			del.textContent = '[-]';
+			del.addEventListener("click", function() {
+				dbg.removeBreakpoint(address);
+				breakpoints.removeChild(li);
+			});
+			li.insertBefore(del, li.firstChild);
+			breakpoints.appendChild(li);
+		}
+		else
+		{
+			dbg.removeBreakpoint(address);
+			var li = breakpoints.querySelector("li[data-address=" + address + "]");
+			breakpoints.removeChild(li);
 		}
 	}
 	
@@ -73,7 +125,7 @@ document.addEventListener("DOMContentLoaded", function()
 		{
 			if (psx.memory != null)
 			{
-				disasm.reset(psx.memory, dbg.pc - 8, dbg.pc + 0x80, dbg.pc, runPC);
+				disasm.reset(psx.memory, dbg.pc - 8, dbg.pc + 0x80, dbg.pc, runPC, toggleBreakpoint);
 				disasmContainer.scrollTop = 12;
 			}
 		}
@@ -86,8 +138,18 @@ document.addEventListener("DOMContentLoaded", function()
 		pauseButton.disabled = true;
 		stepOverButton.disabled = false;
 		stepIntoButton.disabled = !dbg.canStepInto();
-		diagnostics.log("BIOS » " + Recompiler.formatHex32(dbg.pc));
+		
+		var hexPC = Recompiler.formatHex(dbg.pc);
+		if (stack.firstChild)
+		{
+			var frameNumber = stack.childNodes.length - 1;
+			stack.firstChild.textContent = frameNumber + ": " + hexPC;
+		}
+		diagnostics.log("BIOS » " + hexPC);
 	}
+	
+	dbg.onsteppedinto = refreshStack;
+	dbg.onsteppedout = refreshStack;
 	
 	document.querySelector("#bios-picker").addEventListener("change", function()
 	{
@@ -100,12 +162,9 @@ document.addEventListener("DOMContentLoaded", function()
 			var memory = new MemoryMap(hardwareRegisters, parallelPort, bios);
 			
 			psx.stop();
-			psx.hardwareReset();
-			psx.softwareReset(memory);
-			dbg.pc = R3000a.bootAddress;
-			dbg.onstepped();
+			dbg.reset(R3000a.bootAddress, memory);
 			
-			var message = "Loaded BIOS » 0x" + Recompiler.formatHex32(dbg.pc);
+			var message = "Loaded BIOS » 0x" + Recompiler.formatHex(dbg.pc);
 			status.display(message, 'black');
 		}
 		reader.readAsArrayBuffer(this.files[0]);
@@ -119,7 +178,7 @@ document.addEventListener("DOMContentLoaded", function()
 			label.textContent += " / " + nameArray[id];
 		
 		var field = document.createElement("input");
-		field.size = (byteSize * 2) + 3;
+		field.size = (byteSize * 2) + 1;
 		field.type = "text";
 		field.addEventListener("blur", function()
 		{
@@ -148,7 +207,7 @@ document.addEventListener("DOMContentLoaded", function()
 	var regs = [];
 	for (var i = 0; i < 16; i++)
 	{
-		var gpr = regField("GPR", 8, i, Disassembler.registerNames);
+		var gpr = regField("GPR", 4, i, Disassembler.registerNames);
 		var cpr = regField("CPR", 4, i, Disassembler.cop0RegisterNames);
 		regContainers[0].appendChild(gpr);
 		regContainers[1].appendChild(cpr);
@@ -157,28 +216,33 @@ document.addEventListener("DOMContentLoaded", function()
 	
 	for (var i = 16; i < 32; i++)
 	{
-		var gpr = regField("GPR", 8, i, Disassembler.registerNames);
+		var gpr = regField("GPR", 4, i, Disassembler.registerNames);
 		regContainers[0].appendChild(gpr);
 		regs.push(gpr);
 	}
 	
-	var runHandle = {interrupt: function() {}};
+	function showDivByIndex(index)
+	{
+		return function()
+		{
+			var divs = this.parentNode.parentNode.querySelectorAll(".collapsable");
+			for (var i = 0; i < divs.length; i++)
+			{
+				if (i == index)
+					divs[i].style.display = "block";
+				else
+					divs[i].style.display = "none";
+			}
+		}
+	}
 	
 	var registerLabels = document.querySelectorAll("#regs > legend span");
-	var regsDiv = document.querySelector("#regs > div");
 	for (var i = 0; i < registerLabels.length; i++)
-	{
-		registerLabels[i].addEventListener("click", function()
-		{
-			regsDiv.scrollTop = 0;
-			var current = this;
-			while (current.previousElementSibling != null)
-			{
-				regsDiv.scrollTop += 475;
-				current = current.previousElementSibling;
-			}
-		});
-	}
+		registerLabels[i].addEventListener("click", showDivByIndex(i));
+	
+	var utilLabels = document.querySelectorAll("#utils > legend span");
+	for (var i = 0; i < utilLabels.length; i++)
+		utilLabels[i].addEventListener("click", showDivByIndex(i));
 	
 	disasmContainer.addEventListener("scroll", function(e)
 	{
@@ -199,28 +263,31 @@ document.addEventListener("DOMContentLoaded", function()
 	
 	pauseButton.disabled = true;
 	
+	var run = dbg.run.bind(dbg);
 	var stepOver = dbg.stepOver.bind(dbg);
-	
-	function stepInto()
-	{
-		dbg.stepInto();
-	}
+	var stepInto = dbg.stepInto.bind(dbg);
+	var stepOut = dbg.stepOut.bind(dbg);
 	
 	function pause()
 	{
-		runHandle.interrupt();
+		// TODO cannot pause with the new system
 		pauseButton.disabled = true;
 	}
 	
 	function goTo()
 	{
-		var address = prompt("Go to address (hex):", Recompiler.formatHex32(dbg.pc));
-		var realAddress = parseInt(address, 16) - 4;
-		disasm.reset(psx.memory, realAddress - 8, realAddress + 0x80, dbg.pc, runPC);
+		var address = prompt("Go to address (hex):", Recompiler.formatHex(dbg.pc));
+		if (address !== null)
+		{
+			var realAddress = parseInt(address, 16) - 4;
+			disasm.reset(psx.memory, realAddress - 8, realAddress + 0x80, realAddress, runPC, toggleBreakpoint);
+		}
 	}
 	
+	runButton.addEventListener("click", run);
 	stepOverButton.addEventListener("click", stepOver);
 	stepIntoButton.addEventListener("click", stepInto);
+	stepOutButton.addEventListener("click", stepOut);
 	pauseButton.addEventListener("click", pause);
 	goToButton.addEventListener("click", goTo);
 	
@@ -230,6 +297,7 @@ document.addEventListener("DOMContentLoaded", function()
 		{
 			case 13: stepOver(); break;
 			case 27: pause(); break;
+			case 37: stepOut(); break;
 			case 39:
 				if (dbg.canStepInto())
 					dbg.stepInto();
@@ -241,6 +309,5 @@ document.addEventListener("DOMContentLoaded", function()
 		}
 	});
 	
-	dbg.onstepped();
 	status.display("← Waiting for a BIOS...");
 });

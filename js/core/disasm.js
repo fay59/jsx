@@ -89,7 +89,7 @@ Disassembler.registerNames = [
 
 Disassembler.cop0RegisterNames = [
 	"Index", "Random", "EntryLo0", "BreakPC", "Context", "BreakData", "PIDMask",
-	"DCIC", "BadVAddr", "BreakDMask", "EntryHi", "BreakCnt", "SR", "Cause", "EPC",
+	"DCIC", "BadVAddr", "BreakMask", "EntryHi", "BreakCnt", "SR", "Cause", "EPC",
 	"PRId", "ErrReg"
 ];
 
@@ -468,8 +468,6 @@ Disassembler.patternData = {
 Disassembler.patterns = [];
 
 (function() {
-	/// STRING patterns
-	/// (transforming patterns into a more convenient form)
 	function tryParse(opcode)
 	{
 		var xored = opcode ^ this.xorMask;
@@ -488,6 +486,8 @@ Disassembler.patterns = [];
 		return values;
 	}
 	
+	// takes the string binary patterns and turn them into a form we can easily
+	// match
 	for (var instruction in Disassembler.patternData)
 	{
 		var pattern = Disassembler.patternData[instruction].pattern;

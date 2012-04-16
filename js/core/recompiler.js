@@ -11,6 +11,7 @@ Recompiler = function()
 	this.address = 0;
 	this.epc = 0; // the place to set EPC in case of an exception
 	this.opcodes = {};
+	this.injector = null;
 }
 
 Recompiler.prototype.recompileFunction = function(memory, startAddress)
@@ -81,7 +82,12 @@ Recompiler.prototype.recompileFunction = function(memory, startAddress)
 
 Recompiler.prototype.recompileOpcode = function(currentAddress, op)
 {
-	var addressString = Recompiler.formatHex32(currentAddress);
+	var injectedBefore = this._injectBefore(currentAddress, op);
+	var injectedAfter = this._injectAfter(currentAddress, op);
+	if (injectedBefore === undefined) injectedBefore = '';
+	if (injectedAfter === undefined) injectedAfter = '';
+	
+	var addressString = Recompiler.formatHex(currentAddress);
 	var opcodeString = Disassembler.getOpcodeAsString(op);
 	var commentString = addressString + ": " + opcodeString;
 	var jsComment = "// " + commentString + "\n";
@@ -89,26 +95,12 @@ Recompiler.prototype.recompileOpcode = function(currentAddress, op)
 	if (instructionCode === undefined)
 		this.panic(commentString + " was recompiled as undefined");
 	
-	return jsComment + instructionCode;
-}
-
-Recompiler.unsign = function(x)
-{
-	var lastBit = x & 1;
-	return (x >>> 1) * 2 + lastBit;
-}
-
-Recompiler.formatHex32 = function(address)
-{
-	var output = Recompiler.unsign(address).toString(16);
-	while (output.length != 8)
-		output = 0 + output;
-	return output;
+	return injectedBefore + jsComment + instructionCode + injectedAfter;
 }
 
 Recompiler.prototype.addLabel = function(label)
 {
-	var labelString = Recompiler.formatHex32(label);
+	var labelString = Recompiler.formatHex(label);
 	// check that the location actually exists
 	var translated = this.memory.translate(label);
 	if (translated.buffer == MemoryMap.unmapped)
@@ -147,7 +139,7 @@ Recompiler.prototype.nextInstruction = function()
 {
 	var translated = this.memory.translate(this.address);
 	if (translated.buffer == MemoryMap.unmapped)
-		this.panic("accessing invalid memory address " + Recompiler.formatHex32(this.address));
+		this.panic("accessing invalid memory address " + Recompiler.formatHex(this.address));
 	
 	var pattern = this.memory.read32(this.address);
 	var op = Disassembler.getOpcode(pattern);
@@ -169,7 +161,7 @@ Recompiler.prototype.panic = function(instruction, address)
 			binary = "0" + binary;
 		
 		binary = binary.replace(/(....)/g, '$1 ').substr(0, 39);
-		throw new Error("No matching instruction for pattern " + binary + " at " + Recompiler.formatHex32(address));
+		throw new Error("No matching instruction for pattern " + binary + " at " + Recompiler.formatHex(address));
 	}
 	else
 	{
@@ -182,7 +174,7 @@ Recompiler.functionPrelude = "var condition = false;\nvar writeAddress = 0;\nvar
 Recompiler.prototype.compile = function()
 {
 	// the conditional allows to resume a function at a certain label
-	var startAddress = "0x" + Recompiler.formatHex32(this.startAddress);
+	var startAddress = "0x" + Recompiler.formatHex(this.startAddress);
 	var jsCode = "pc = isFinite(pc) ? pc : " + startAddress + ";\n";
 	jsCode += "this.currentFunction = " + startAddress + ";\n"
 	jsCode += Recompiler.functionPrelude;
@@ -215,16 +207,16 @@ Recompiler.prototype.compile = function()
 		
 		// should we create a new label?
 		if (this.compiledAddresses.indexOf(address) != -1)
-			jsCode += "case 0x" + Recompiler.formatHex32(address) + ":\n";
+			jsCode += "case 0x" + Recompiler.formatHex(address) + ":\n";
 		
 		jsCode += this.code[address] + "\n";
 	}
 	
-	jsCode += "default: this.panic('unreferenced block 0x' + Recompiler.formatHex32(pc)); break;\n";
+	jsCode += "default: this.panic('unreferenced block 0x' + Recompiler.formatHex(pc)); break;\n";
 	jsCode += "}\n}";
 	
-	var functionName = "." + Recompiler.formatHex32(this.startAddress);
-	var compiled = new Function("pc", jsCode);
+	var functionName = "." + Recompiler.formatHex(this.startAddress);
+	var compiled = new Function("pc", "context", jsCode);
 	compiled.name = functionName;
 	
 	return {
@@ -247,7 +239,7 @@ Recompiler.prototype.recompileOne = function(memory, address)
 	
 	var op = this.nextInstruction();
 	var code = Recompiler.functionPrelude
-		+ "var pc = 0x" + Recompiler.formatHex32(address) + " + 4;\n"
+		+ "var pc = 0x" + Recompiler.formatHex(address) + " + 4;\n"
 		+ "do {\n"
 		+ this.recompileOpcode(address, op)
 		+ "} while (false);\n";
@@ -264,33 +256,36 @@ Recompiler.prototype.recompileOne = function(memory, address)
 	return new Function(code);
 }
 
-// recompile until we hit a branch, useful for running until a given address
-Recompiler.prototype.recompileBlock = function(memory, address, maxAddress)
+Recompiler.prototype._injectBefore = function(address, opcode)
 {
-	this.memory = memory;
-	this.address = address;
-	
-	var code = Recompiler.functionPrelude
-		+ "var pc = 0x" + Recompiler.formatHex32(address) + " + 4;\n"
-		+ "switch (0) {\n" + "case 0:\n";
-	
-	do
-	{
-		var currentAddress = this.address;
-		var op = this.nextInstruction();
-		code += this.recompileOpcode(currentAddress, op);
-	} while (op.instruction.name[0] != 'b' && this.address != maxAddress);
-	
-	code += "pc = 0x" + Recompiler.formatHex32(this.address) + ";\n";
-	code += "}\n" + "return pc;\n";
-	
-	this.address = 0;
-	this.memory = null;
-	
-	return new Function(code);
-};
+	if (this.injector != null && this.injector.injectBefore !== undefined && this.injector.injectBefore.call !== undefined)
+		return this.injector.injectBefore.call(this.injector, address, opcode);
+	return '';
+}
 
-(function()
+Recompiler.prototype._injectAfter = function(address, opcode)
+{
+	if (this.injector != null && this.injector.injectAfter !== undefined && this.injector.injectAfter.call !== undefined)
+		return this.injector.injectAfter.call(this.injector, address, opcode);
+	return '';
+}
+
+Recompiler.unsign = function(x)
+{
+	var lastBit = x & 1;
+	return (x >>> 1) * 2 + lastBit;
+}
+
+Recompiler.formatHex = function(address, length)
+{
+	if (length === undefined) length = 8;
+	var output = Recompiler.unsign(address).toString(16);
+	while (output.length < length)
+		output = 0 + output;
+	return output;
+}
+
+;(function()
 {
 	/// OPCODES
 	/// A MIPS reference can be found at http://www.mrc.uidaho.edu/mrc/people/jff/digital/MIPSir.html
@@ -340,7 +335,7 @@ Recompiler.prototype.recompileBlock = function(memory, address, maxAddress)
 	{
 		if (x === undefined)
 			this.panic("undefined value to format");
-		return "0x" + Recompiler.formatHex32(x);
+		return "0x" + Recompiler.formatHex(x);
 	}
 	
 	function panic(message)
@@ -443,7 +438,7 @@ Recompiler.prototype.recompileBlock = function(memory, address, maxAddress)
 	});
 	
 	impl("addi", function(s, t, i) {
-		return binaryOpTrap("+", t, s, hex(signExt(i, 16)));
+		return binaryOpTrap("+", t, s, signExt(i, 16));
 	});
 	
 	impl("addiu", function(s, t, i) {
@@ -595,7 +590,11 @@ Recompiler.prototype.recompileBlock = function(memory, address, maxAddress)
 	
 	impl("jal", function(i) {
 		var jumpAddress = ((this.address - 4) & 0xF0000000) | (i << 2);
-		return delaySlot.call(this) + "this.execute(" + hex(jumpAddress) + ");\n";
+		
+		var jsCode = delaySlot.call(this);
+		jsCode += gpr(31) + " = " + hex(this.address + 4) + ";\n";
+		jsCode += "this.execute(" + hex(jumpAddress) + ");\n";
+		return jsCode;
 	});
 	
 	impl("jalr", function(s, d) {
@@ -639,7 +638,7 @@ Recompiler.prototype.recompileBlock = function(memory, address, maxAddress)
 	});
 	
 	impl("lui", function(t, i) {
-		return gpr(t) + " = 0x" + Recompiler.unsign(i << 16).toString(16) + ";\n";
+		return gpr(t) + " = " + hex(i << 16) + ";\n";
 	});
 	
 	impl("lw", function(s, t, i) {
@@ -823,9 +822,8 @@ Recompiler.prototype.recompileBlock = function(memory, address, maxAddress)
 		return panic("sra is not implemented");
 	});
 	
-	impl("srav", function() {
-		countUnimplemented.call(this, "srav");
-		return panic("srav is not implemented");
+	impl("srav", function(s, t, d) {
+		return binaryOp(">>", d, t, gpr(s));
 	});
 	
 	impl("srl", function(t, d, i) {

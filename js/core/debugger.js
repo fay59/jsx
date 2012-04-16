@@ -1,3 +1,13 @@
+var Breakpoint = function(address)
+{
+	this.address = address;
+}
+
+Breakpoint.prototype.toString = function()
+{
+	return "breakpoint at address 0x" + Recompiler.formatHex(this.address);
+}
+
 var Debugger = function(cpu)
 {
 	var pc = R3000a.bootAddress;
@@ -5,38 +15,46 @@ var Debugger = function(cpu)
 	this.__defineGetter__("pc", function() { return pc; });
 	this.__defineSetter__("pc", function(x) { pc = Recompiler.unsign(x); });
 	
+	this.stack = [];
 	this.cpu = cpu;
 	this.trace = [];
 	this.running = false;
-	this.onstepped = null;
 	this.diag = console;
+	this.breakpoints = [];
+	this.readBreakpoints = [];
+	this.writeBreakpoints = [];
+	
+	this.onstepped = null;
+	this.onsteppedinto = null;
+	this.onsteppedout = null;
+	
+	var self = this;
+	
+	this.cpu.recompiler.injector = {
+		injectBefore: function(address, opcode) {},
+		injectAfter: function(address, opcode)
+		{
+			var nextAddress = address + 4;
+			if (self.breakpoints.indexOf(nextAddress) != -1)
+				return "throw new Breakpoint(0x" + Recompiler.formatHex(nextAddress) + ");\n";
+		}
+	};
 }
 
-Debugger.prototype._stepCallback = function()
+Debugger.prototype.reset = function(pc, memory)
 {
-	if (this.onstepped && this.onstepped.call)
-		this.onstepped.call(this);
-}
-
-Debugger.prototype._parseValue = function(value)
-{
-	value = value.replace(/\s/g, '');
-	if (value.indexOf("0x") == 0)
-	{
-		value = value.substr(2);
-		return parseInt(value, 16);
-	}
-	else if (value.indexOf("0b") == 0)
-	{
-		value = value.substr(2);
-		return parseInt(value, 2);
-	}
-	return parseInt(value);
+	this.pc = pc;
+	this.stack = [0];
+	this.cpu.hardwareReset();
+	this.cpu.softwareReset(memory);
+	
+	this._stepCallback(this.onstepped);
+	this._stepCallback(this.onsteppedinto);
 }
 
 Debugger.prototype.getGPR = function(index)
 {
-	return "0x" + Recompiler.formatHex32(this.cpu.gpr[index]);
+	return "0x" + Recompiler.formatHex(this.cpu.gpr[index]);
 }
 
 Debugger.prototype.setGPR = function(index, value)
@@ -46,12 +64,38 @@ Debugger.prototype.setGPR = function(index, value)
 
 Debugger.prototype.getCPR = function(index)
 {
-	return "0x" + Recompiler.formatHex32(this.cpu.cop0_reg[index]);
+	return "0x" + Recompiler.formatHex(this.cpu.cop0_reg[index]);
 }
 
 Debugger.prototype.setCPR = function(index, value)
 {
 	this.cpu.gpr[index] = this._parseValue(value);
+}
+
+Debugger.prototype.setBreakpoint = function(breakpoint)
+{
+	if (!isFinite(breakpoint))
+		throw new Error("breakpoint needs to be defined and numeric");
+	
+	breakpoint = Recompiler.unsign(breakpoint);
+	this.breakpoints.push(breakpoint);
+	this.cpu.invalidate(breakpoint);
+}
+
+Debugger.prototype.removeBreakpoint = function(breakpoint)
+{
+	if (!isFinite(breakpoint))
+		throw new Error("breakpoint needs to be defined and numeric");
+	
+	breakpoint = Recompiler.unsign(breakpoint);
+	var index = this.breakpoints.indexOf(breakpoint);
+	if (index != -1)
+	{
+		this.breakpoints.splice(index, 1);
+		this.cpu.invalidate(breakpoint);
+		return true;
+	}
+	return false;
 }
 
 Debugger.prototype.stepOver = function()
@@ -66,12 +110,14 @@ Debugger.prototype.stepOver = function()
 		// execute the delay slot then return
 		this.cpu.executeOne(this.pc + 4);
 		this.pc = this.cpu.gpr[31];
+		this.stack.pop();
+		this._stepCallback(this.onsteppedout);
 	}
 	else
 	{
 		this.pc = this.cpu.executeOne(this.pc);
 	}
-	this._stepCallback();
+	this._stepCallback(this.onstepped);
 }
 
 Debugger.prototype.canStepInto = function()
@@ -91,6 +137,8 @@ Debugger.prototype.stepInto = function()
 	if (opcode.instruction.name != "jal" && opcode.instruction.name != "jalr")
 		return false;
 	
+	this.stack.push(this.pc + 8);
+	
 	// execute the delay slot then jump
 	this.cpu.executeOne(this.pc + 4);
 	if (opcode.instruction.name == "jal")
@@ -103,50 +151,65 @@ Debugger.prototype.stepInto = function()
 		this.cpu.gpr[opcode.params[1]] = this.pc + 8;
 		this.pc = this.cpu.gpr[opcode.params[0]];
 	}
-	this._stepCallback();
+	this._stepCallback(this.onsteppedinto);
+	this._stepCallback(this.onstepped);
+}
+
+Debugger.prototype.stepOut = function()
+{
+	this.cpu.execute(this.pc);
+	this.pc = this.stack.pop();
+	this._stepCallback(this.onsteppedout);
+	this._stepCallback(this.onstepped);
 }
 
 Debugger.prototype.runUntil = function(desiredPC)
 {
-	if (this.running)
+	if (!isFinite(desiredPC))
+		throw new Error("desiredPC needs to be defined and finite");
+	
+	desiredPC = Recompiler.unsign(desiredPC);
+	this.breakpoints.push(desiredPC);
+	this.cpu.invalidate(desiredPC);
+	try
 	{
-		this.diag.error("cpu is already executing");
-		return;
+		this.cpu.execute(this.pc);
 	}
-	
-	// one block per event as we don't want the page to get stuck
-	var self = this;
-	var timeout = null;
-	var handle = {
-		interrupt: function()
-		{
-			if (timeout != null)
-			{
-				clearTimeout(timeout);
-				this.running = false;
-				this._stepCallback();
-			}
-		}.bind(self),
-	};
-	
-	var runOneBlock = function()
+	catch (ex)
 	{
-		this.updateTrace();
-		this.pc = this.cpu.executeUntilBranchOrAddress(this.pc, desiredPC);
-		if (this.pc == desiredPC)
+		if (ex.constructor == Breakpoint)
 		{
-			this._stepCallback();
-			timeout = null;
-			this.running = false;
-			return;
+			this.pc = ex.address;
+			this.breakpoints.pop();
+			this.cpu.invalidate(desiredPC);
+			
+			this._stepCallback(this.onstepped);
 		}
-		
-		timeout = setTimeout(runOneBlock, 0);
-	}.bind(this);
-	
-	this.running = true;
-	timeout = setTimeout(runOneBlock, 0);
-	return handle;
+		else
+		{
+			this.diags.error(ex.message);
+		}
+	}
+}
+
+Debugger.prototype.run = function()
+{
+	try
+	{
+		this.cpu.execute(this.pc);
+	}
+	catch (ex)
+	{
+		if (ex.constructor == Breakpoint)
+		{
+			this.pc = ex.address;
+			this._stepCallback(this.onstepped);
+		}
+		else
+		{
+			this.diags.error(ex.message);
+		}
+	}
 }
 
 Debugger.prototype.updateTrace = function()
@@ -155,5 +218,27 @@ Debugger.prototype.updateTrace = function()
 	var op = Disassembler.getOpcode(bits);
 	var string = Disassembler.getOpcodeAsString(op);
 	this.trace.push([this.pc, string, this.cpu.registerMemory.slice(0)]);
+}
+
+Debugger.prototype._stepCallback = function(fn)
+{
+	if (fn != null && fn.call)
+		fn.call(this);
+}
+
+Debugger.prototype._parseValue = function(value)
+{
+	value = value.replace(/\s/g, '');
+	if (value.indexOf("0x") == 0)
+	{
+		value = value.substr(2);
+		return parseInt(value, 16);
+	}
+	else if (value.indexOf("0b") == 0)
+	{
+		value = value.substr(2);
+		return parseInt(value, 2);
+	}
+	return parseInt(value);
 }
 

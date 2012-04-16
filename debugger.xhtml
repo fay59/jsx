@@ -24,24 +24,36 @@
 <fieldset id="regs">
 	<legend>
 		<span>GPR</span> /
-		<span>CPR</span>
+		<span>CPR</span> /
+		<span>Memory</span>
 	</legend>
 	<div>
-		<div class="regs"/>
-		<div class="regs"/>
+		<div class="regs collapsable"/>
+		<div class="regs collapsable"/>
+		<div class="memory collapsable"/>
 	</div>
 </fieldset>
 
 <fieldset id="disassembly">
 	<legend>Disassembly</legend>
-	<button id="refresh">⟳</button>
+	<button id="run">Run</button>
 	<button id="step-over">Step over</button>
 	<button id="step-into">Step into</button>
+	<button id="step-out">Step out</button>
 	<button id="pause">Pause</button>
 	<button id="goto">Go to...</button>
 	<div id="disasm-container">
 		<table id="disasm"/>
 	</div>
+</fieldset>
+
+<fieldset id="utils">
+	<legend>
+		<span>Stack</span> /
+		<span>Breakpoints</span>
+	</legend>
+	<select id="stack" class="collapsable" multiple="multiple"/>
+	<ul id="breakpoints" class="collapsable"/>
 </fieldset>
 
 </body>
