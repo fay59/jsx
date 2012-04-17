@@ -98,13 +98,15 @@ Recompiler.prototype.recompileOpcode = function(currentAddress, op)
 	return injectedBefore + jsComment + instructionCode + injectedAfter;
 }
 
-Recompiler.prototype.addLabel = function(label)
+Recompiler.prototype.addLabel = function(label, opAddress)
 {
 	var labelString = Recompiler.formatHex(label);
+	var opAddressString = Recompiler.formatHex(opAddress);
+	
 	// check that the location actually exists
 	var translated = this.memory.translate(label);
 	if (translated.buffer == MemoryMap.unmapped)
-		this.panic("branch or jump to unmapped location " + labelString);
+		this.panic("branch or jump to unmapped location " + labelString + " from address " + opAddressString);
 		
 	// check that the label is not in a delay slot
 	// just warn if so, because the previous word is possibly not an instruction
@@ -114,7 +116,10 @@ Recompiler.prototype.addLabel = function(label)
 	{
 		var firstLetter = op.instruction.name[0];
 		if (firstLetter == 'b' || firstLetter == 'j')
-			this.diags.warn("label " + labelString + " falling into the delay slot of a branch");
+		{
+			var message = "label " + labelString + " from " + opAddressString + " falling into the delay slot of a branch"
+			this.diags.warn(message);
+		}
 	}
 
 	if (this.compiledAddresses.indexOf(label) == -1)
@@ -246,7 +251,7 @@ Recompiler.prototype.recompileOne = function(memory, address)
 	
 	// account for the delay slot, it needs to be skipped in the case of a
 	// branch or call (but NOT in the case of a jump!)
-	if (op.instruction.name[0] == 'b' || op.instruction.name == 'jal' || op.instruction.name == 'jalr')
+	if (op.instruction.name == 'jal' || op.instruction.name == 'jalr')
 		code += "pc += 4;\n";
 	
 	code += "return pc;\n";
@@ -254,7 +259,7 @@ Recompiler.prototype.recompileOne = function(memory, address)
 	this.address = 0;
 	this.memory = null;
 	
-	return new Function(code);
+	return new Function("context", code);
 }
 
 Recompiler.prototype._injectBefore = function(address, opcode)
@@ -409,8 +414,9 @@ Recompiler.formatHex = function(address, length)
 	
 	function jump(targetWord)
 	{
-		var jumpAddress = Recompiler.unsign(((this.address - 4) & 0xF0000000) | (targetWord << 2));
-		this.addLabel(jumpAddress);
+		var opAddress = this.address - 4;
+		var jumpAddress = Recompiler.unsign((opAddress & 0xF0000000) | (targetWord << 2));
+		this.addLabel(jumpAddress, opAddress);
 		
 		var jsCode = "pc = " + hex(jumpAddress) + ";\n";
 		jsCode += delaySlot.call(this);
@@ -420,9 +426,9 @@ Recompiler.formatHex = function(address, length)
 	
 	function branch(condition, offset)
 	{
-		var currentAddress = this.address;
-		var targetAddress = Recompiler.unsign(currentAddress + (signExt(offset, 16) << 2));
-		this.addLabel(targetAddress);
+		var opAddress = this.address;
+		var targetAddress = Recompiler.unsign(opAddress + (signExt(offset, 16) << 2));
+		this.addLabel(targetAddress, opAddress);
 		
 		var jsCode = "condition = " + condition + ";\n";
 		jsCode += delaySlot.call(this);
@@ -443,11 +449,11 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("addiu", function(s, t, i) {
-		return binaryOp("+", t, s, hex(i));
+		return binaryOp("+", t, s, signExt(i, 16));
 	});
 	
 	impl("addu", function(s, t, d) {
-		return binaryOp("+", s, d, t);
+		return binaryOp("+", d, s, t);
 	});
 	
 	impl("and", function(s, t, d) {
@@ -593,15 +599,15 @@ Recompiler.formatHex = function(address, length)
 		var jumpAddress = ((this.address - 4) & 0xF0000000) | (i << 2);
 		
 		var jsCode = delaySlot.call(this);
-		jsCode += gpr(31) + " = " + hex(this.address + 4) + ";\n";
-		jsCode += "this.execute(" + hex(jumpAddress) + ");\n";
+		jsCode += gpr(31) + " = " + hex(this.address) + ";\n";
+		jsCode += "this.execute(" + hex(jumpAddress) + ", context);\n";
 		return jsCode;
 	});
 	
 	impl("jalr", function(s, d) {
 		var jsCode = delaySlot.call(this);
 		jsCode += gpr(d) + " = " + hex(this.address) + ";\n"
-		jsCode += "this.execute(" + gpr(s) + ");\n";
+		jsCode += "this.execute(" + gpr(s) + ", context);\n";
 		return jsCode;
 	});
 	
@@ -613,7 +619,7 @@ Recompiler.formatHex = function(address, length)
 			jsCode += "return;\n";
 		else
 		{
-			jsCode += "this.execute(" + gpr(s) + ");\n";
+			jsCode += "this.execute(" + gpr(s) + ", context);\n";
 			jsCode += "return;\n";
 		}
 		return jsCode;

@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function()
 			}
 			catch (e)
 			{
-				document.querySelector("#crash").textContent = e.message;
+				document.querySelector("#crash").textContent = e.toString();
 				
 				var totalJitted = 0;
 				var totalUnimplemented = 0;

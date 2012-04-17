@@ -31,7 +31,32 @@ var Debugger = function(cpu)
 	var self = this;
 	
 	this.cpu.recompiler.injector = {
-		injectBefore: function(address, opcode) {},
+		injectBefore: function(address, opcode)
+		{
+			if (opcode.instruction.name == 'jal')
+			{
+				var segmentPrefix = (address - 4) & 0xF0000000;
+				var targetWord = opcode.params[0] << 2;
+				var jumpAddress = Recompiler.unsign(segmentPrefix | targetWord);
+				
+				var jsCode = "context.stack.push(" + jumpAddress + ");\n";
+				jsCode += "context._stepCallback(context.onsteppedinto);\n";
+				return jsCode;
+			}
+			else if (opcode.instruction.name == 'jalr')
+			{
+				var targetReg = opcode.params[0];
+				var jsCode = "context.stack.push(this.gpr[" + targetReg + "]);\n";
+				jsCode += "context._stepCallback(context.onsteppedinto);\n";
+				return jsCode;
+			}
+			else if (opcode.instruction.name == 'jr' && opcode.params[0] == 31)
+			{
+				var jsCode = "context.stack.pop();\n";
+				jsCode += "context._stepCallback(context.onsteppedout);\n";
+				return jsCode;
+			}
+		},
 		injectAfter: function(address, opcode)
 		{
 			var nextAddress = address + 4;
@@ -108,7 +133,7 @@ Debugger.prototype.stepOver = function()
 	if (opcode.instruction.name == "jr" && opcode.params[0] == 31)
 	{
 		// execute the delay slot then return
-		this.cpu.executeOne(this.pc + 4);
+		this.cpu.executeOne(this.pc + 4, this);
 		this.pc = this.cpu.gpr[31];
 		this.stack.pop();
 		this._stepCallback(this.onsteppedout);
@@ -117,7 +142,7 @@ Debugger.prototype.stepOver = function()
 	{
 		try
 		{
-			this.pc = this.cpu.executeOne(this.pc);
+			this.pc = this.cpu.executeOne(this.pc, this);
 		}
 		catch (ex)
 		{
@@ -147,7 +172,7 @@ Debugger.prototype.stepInto = function()
 	this.stack.push(this.pc + 8);
 	
 	// execute the delay slot then jump
-	this.cpu.executeOne(this.pc + 4);
+	this.cpu.executeOne(this.pc + 4, this);
 	if (opcode.instruction.name == "jal")
 	{
 		this.cpu.gpr[31] = this.pc + 8;
@@ -164,7 +189,7 @@ Debugger.prototype.stepInto = function()
 
 Debugger.prototype.stepOut = function()
 {
-	this.cpu.execute(this.pc);
+	this.cpu.execute(this.pc, this);
 	this.pc = this.stack.pop();
 	this._stepCallback(this.onsteppedout);
 	this._stepCallback(this.onstepped);
@@ -180,7 +205,7 @@ Debugger.prototype.runUntil = function(desiredPC)
 	this.cpu.invalidate(desiredPC);
 	try
 	{
-		this.cpu.execute(this.pc);
+		this.cpu.execute(this.pc, this);
 	}
 	catch (ex)
 	{
@@ -192,7 +217,7 @@ Debugger.prototype.run = function()
 {
 	try
 	{
-		this.cpu.execute(this.pc);
+		this.cpu.execute(this.pc, this);
 	}
 	catch (ex)
 	{

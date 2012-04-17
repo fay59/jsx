@@ -54,7 +54,8 @@ Disassembler.getOpcodeAsString = function(opcode)
 			case 'i':
 				if (format.indexOf('{i<<2}') != -1)
 				{
-					format = format.replace('{i<<2}', "0x" + (param << 2).toString(16));
+					var jump = (param & 0xFFFF0000) == 0 ? (param << 16) >> 14 : param << 2;
+					format = format.replace('{i<<2}', jump.toString(16));
 				}
 				else
 				{
@@ -143,7 +144,7 @@ Disassembler.patternData = {
 		pattern: '0000 01ss sss0 0001 iiii iiii iiii iiii',
 		format: 'bgez {s}, {i<<2}'
 	},
-	'bgezal': {	// branch on greater than or equal to zero and link
+	'bgezal': {	// branch on greater than or equal to zero likely
 		pattern: '0000 01ss sss1 0001 iiii iiii iiii iiii',
 		format: 'bgezal {s}, {i<<2}'
 	},
@@ -159,7 +160,7 @@ Disassembler.patternData = {
 		pattern: '0000 01ss sss0 0000 iiii iiii iiii iiii',
 		format: 'bltz {s}, {i<<2}'
 	},
-	'bltzal': {	// branch on less than zero and link
+	'bltzal': {	// branch on less than zero likely
 		pattern: '0000 01ss sss1 0000 iiii iiii iiii iiii',
 		format: 'bltzal {s}, {i<<2}'
 	},

@@ -7,6 +7,8 @@ var ExecutionException = function(message, pc, cause)
 
 ExecutionException.prototype.toString = function()
 {
+	if (this.cause !== undefined)
+		return this.message + "(" + this.cause.toString() + ")";
 	return this.message;
 }
 
@@ -82,7 +84,7 @@ R3000a.prototype.stop = function()
 	this.stopped = true;
 }
 
-// this simulates the N64 hardware as if it just powered on
+// this simulates the PSX hardware as if it just powered on
 R3000a.prototype.hardwareReset = function()
 {
 	for (var i = 0; i < 32; i++)
@@ -95,10 +97,12 @@ R3000a.prototype.hardwareReset = function()
 	// hi, lo
 	this.gpr[32] = 0;
 	this.gpr[33] = 0;
+	
+	this.cop0_reg[12] = 0x00400002;
+	this.cop0_reg[15] = 0x00000002;
 }
 
-// this simulates the action of the PIF ROM
-// furiously inspired from mupen64plus's source code
+// this should be merged with hardwareReset, really
 R3000a.prototype.softwareReset = function(memory, cdrom)
 {
 	this.memory = memory;
@@ -134,13 +138,13 @@ R3000a.prototype.execute = function(address, context)
 		}
 	}
 	
-	this.compiled[address].code.call(this);
+	this.compiled[address].code.call(this, address, context);
 }
 
 R3000a.prototype.executeOne = function(address, context)
 {
 	var func = this.recompiler.recompileOne(this.memory, address, context);
-	return func.call(this);
+	return func.call(this, context);
 }
 
 // ugly linear search
