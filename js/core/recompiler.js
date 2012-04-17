@@ -381,8 +381,8 @@ Recompiler.formatHex = function(address, length)
 			this.panic("undefined argument");
 		
 		var address = gpr(addressReg);
-		if (offset != 0)
-			address += " + " + hex(offset);
+		offset = signExt(offset, 16);
+		address += " + " + offset;
 		
 		var jsCode = gpr(into) + " = this.memory.read" + bits + "(" + address + ")\n";
 		return jsCode;
@@ -394,8 +394,8 @@ Recompiler.formatHex = function(address, length)
 			this.panic("undefined argument");
 		
 		var address = gpr(addressReg);
-		if (offset != 0)
-			address += " + " + hex(offset);
+		offset = signExt(offset, 16);
+		address += " + " + offset;
 		
 		var jsCode = "this.memory.write" + bits + "(" + address + ", " + gpr(value) + ");\n";
 		jsCode += "this.invalidate(" + address + ");\n";
@@ -461,7 +461,7 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("andi", function(s, t, i) {
-		return binaryOp("&", t, s, hex(i));
+		return binaryOp("&", t, s, signExt(i, 16));
 	});
 	
 	impl("avsz3", function() {
