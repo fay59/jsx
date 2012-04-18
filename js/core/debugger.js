@@ -169,7 +169,11 @@ Debugger.prototype.stepOver = function()
 	{
 		try
 		{
-			this.pc = this.cpu.executeOne(this.pc, this);
+			var newPC = this.cpu.executeOne(this.pc, this);
+			// correct for branches
+			if (newPC == this.pc + 4 && opcode.instruction.name[0] == 'b')
+				newPC += 4;
+			this.pc = newPC;
 		}
 		catch (ex)
 		{

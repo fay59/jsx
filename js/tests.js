@@ -278,6 +278,68 @@ var Tests = {
 			with (Assembler.registerNames)
 				r.assert(cpu.gpr[at] == (t7 >> 4), "execution didn't have the expected result");
 			r.complete();
+		},
+		
+		"srl": function(r)
+		{
+			var cpu = perform(["srl at, t7, 4"]);
+			with (Assembler.registerNames)
+				r.assert(cpu.gpr[at] == (t7 >>> 4), "execution didn't have the expected result");
+			r.complete();
+		},
+		
+		"srav": function(r)
+		{
+			var cpu = perform(["srav at, t7, t0"]);
+			with (Assembler.registerNames)
+				r.assert(cpu.gpr[at] == (t7 >> t0), "execution didn't have the expected result");
+			r.complete();
+		},
+		
+		"subu with positive result": function(r)
+		{
+			var cpu = perform(["subu at, t7, t0"]);
+			with (Assembler.registerNames)
+				r.assert(cpu.gpr[at] == (t7 - t0), "execution didn't have the expected result");
+			r.complete();
+		},
+		
+		"subu with negative result": function(r)
+		{
+			var cpu = perform(["subu at, t0, t7"]);
+			with (Assembler.registerNames)
+				r.assert((cpu.gpr[at] | 0) == (t0 - t7), "execution didn't have the expected result");
+			r.complete();
+		},
+		
+		"sltu with false result": function(r)
+		{
+			var cpu = perform([
+				"ori t0, r0, 4000",
+				"ori t1, r0, 5000",
+				"sltu at, t0, t1"]);
+			with (Assembler.registerNames)
+				r.assert(cpu.gpr[at] == 1, "execution didn't have the expected result");
+			r.complete();
+		},
+		
+		"sltu with true result": function(r)
+		{
+			var cpu = perform([
+				"ori t0, r0, 5000",
+				"ori t1, r0, 4000",
+				"sltu at, t0, t1"]);
+			with (Assembler.registerNames)
+				r.assert(cpu.gpr[at] == 0, "execution didn't have the expected result");
+			r.complete();
+		},
+		
+		"or": function(r)
+		{
+			var cpu = perform(["or at, t6, t8"]);
+			with (Assembler.registerNames)
+				r.assert(cpu.gpr[at] == (t6 | t8), "execution didn't have the expected result");
+			r.complete();
 		}
 	}
 };
@@ -301,8 +363,7 @@ document.addEventListener('DOMContentLoaded', function()
 		for (var testName in tests)
 		{
 			var result = document.createElement('li');
-			result.textContent = testName;
-			result.appendChild(document.createElement('br'));
+			result.textContent = testName + ": ";
 			list.appendChild(result);
 			
 			var message = document.createElement('span');
