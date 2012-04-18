@@ -439,9 +439,8 @@ Recompiler.formatHex = function(address, length)
 		return jsCode;
 	}
 	
-	impl("add", function() {
-		countUnimplemented.call(this, "add");
-		return panic("add is not implemented", this.address - 4);
+	impl("add", function(s, t, d) {
+		return binaryOpTrap(this.address - 4, "+", d, s, gpr(t));
 	});
 	
 	impl("addi", function(s, t, i) {
@@ -453,11 +452,11 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("addu", function(s, t, d) {
-		return binaryOp("+", d, s, t);
+		return binaryOp("+", d, s, gpr(t));
 	});
 	
 	impl("and", function(s, t, d) {
-		return binaryOp("&", s, d, t);
+		return binaryOp("&", d, s, gpr(t));
 	});
 	
 	impl("andi", function(s, t, i) {
@@ -483,9 +482,8 @@ Recompiler.formatHex = function(address, length)
 		return panic("beql is not implemented", this.address - 4);
 	});
 	
-	impl("bgez", function() {
-		countUnimplemented.call(this, "bgez");
-		return panic("bgez is not implemented", this.address - 4);
+	impl("bgez", function(s, i) {
+		return branch.call(this, gpr(s) + " >= 0", i);
 	});
 	
 	impl("bgezal", function() {
@@ -493,9 +491,8 @@ Recompiler.formatHex = function(address, length)
 		return panic("bgezal is not implemented", this.address - 4);
 	});
 	
-	impl("bgtz", function() {
-		countUnimplemented.call(this, "bgtz");
-		return panic("bgtz is not implemented", this.address - 4);
+	impl("bgtz", function(s, i) {
+		return branch.call(this, gpr(s) + " > 0", i);
 	});
 	
 	impl("blez", function() {
@@ -824,9 +821,8 @@ Recompiler.formatHex = function(address, length)
 		return panic("sqr is not implemented", this.address - 4);
 	});
 	
-	impl("sra", function() {
-		countUnimplemented.call(this, "sra");
-		return panic("sra is not implemented", this.address - 4);
+	impl("sra", function(t, d, i) {
+		return binaryOp(">>", d, t, i);
 	});
 	
 	impl("srav", function(s, t, d) {
@@ -847,9 +843,8 @@ Recompiler.formatHex = function(address, length)
 		return panic("sub is not implemented", this.address - 4);
 	});
 	
-	impl("subu", function() {
-		countUnimplemented.call(this, "subu");
-		return panic("subu is not implemented", this.address - 4);
+	impl("subu", function(s, t, d) {
+		return binaryOp("-", d, s, t);
 	});
 	
 	impl("sw", function(s, t, i) {

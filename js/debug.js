@@ -1,11 +1,14 @@
+var psx = null;
+var dbg = null;
+
 document.addEventListener("DOMContentLoaded", function()
 {
 	const disassemblyLength = 25;
 	
 	var status = new StatusQueue(document.querySelector("#status"));
 	var disasm = new DisassemblyTable(document.querySelector("#disasm"));
-	var psx = new R3000a();
-	var dbg = new Debugger(psx);
+	psx = new R3000a();
+	dbg = new Debugger(psx);
 	
 	var runButton = document.querySelector("#run");
 	var stepOverButton = document.querySelector("#step-over");

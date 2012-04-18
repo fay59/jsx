@@ -8,7 +8,7 @@ var ExecutionException = function(message, pc, cause)
 ExecutionException.prototype.toString = function()
 {
 	if (this.cause !== undefined)
-		return this.message + "(" + this.cause.toString() + ")";
+		return this.message + " (" + this.cause.toString() + ")";
 	return this.message;
 }
 

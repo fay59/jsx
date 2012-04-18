@@ -21,8 +21,11 @@ var Debugger = function(cpu)
 	this.running = false;
 	this.diag = console;
 	this.breakpoints = [];
-	this.readBreakpoints = [];
-	this.writeBreakpoints = [];
+	
+	this.watchedRegHit = -1;
+	this.watchedRegs = [];
+	for (var i = 0; i < 32; i++)
+		this.watchedRegs.push(false);
 	
 	this.onstepped = null;
 	this.onsteppedinto = null;
@@ -30,6 +33,25 @@ var Debugger = function(cpu)
 	
 	var self = this;
 	
+	// intercept CPU registers
+	var regs = this.cpu.gpr;
+	this.cpu.gpr = {};
+	function gprGetter(i) { return function() { return regs[i]; }; }
+	function gprSetter(i)
+	{
+		return function(value)
+		{
+			regs[i] = value;
+		}
+	};
+	
+	for (var i = 0; i < regs.length; i++)
+	{
+		this.cpu.gpr.__defineGetter__(i, gprGetter(i));
+		this.cpu.gpr.__defineSetter__(i, gprSetter(i));
+	}
+	
+	// interpose for recompilation
 	this.cpu.recompiler.injector = {
 		injectBefore: function(address, opcode)
 		{
@@ -75,6 +97,11 @@ Debugger.prototype.reset = function(pc, memory)
 	
 	this._stepCallback(this.onstepped);
 	this._stepCallback(this.onsteppedinto);
+}
+
+Debugger.prototype.setWatchRegister = function(index, watch)
+{
+	this.watchedRegs[index] = watch;
 }
 
 Debugger.prototype.getGPR = function(index)
