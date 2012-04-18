@@ -99,6 +99,9 @@ function testCPU()
 	
 	for (var i = 0; i < cpu.gpr.length; i++)
 		cpu.gpr[i] = i;
+	
+	for (var i = 0; i < cpu.cop0_reg.length; i++)
+		cpu.cop0_reg[i] = 32 + i;
 	return cpu;
 }
 
@@ -339,6 +342,26 @@ var Tests = {
 			var cpu = perform(["or at, t6, t8"]);
 			with (Assembler.registerNames)
 				r.assert(cpu.gpr[at] == (t6 | t8), "execution didn't have the expected result");
+			r.complete();
+		},
+		
+		"mfc0": function(r)
+		{
+			var cpu = perform(["mfc0 v0, SR"]);
+			
+			with (Assembler.registerNames)
+			with (Assembler.cop0RegisterNames)
+				r.assert(cpu.gpr[v0] == cpu.cop0_reg[SR], "execution didn't have the expected result");
+			r.complete();
+		},
+		
+		"mtc0": function(r)
+		{
+			var cpu = perform(["mtc0 v0, SR"]);
+			
+			with (Assembler.registerNames)
+			with (Assembler.cop0RegisterNames)
+				r.assert(cpu.gpr[v0] == cpu.cop0_reg[SR], "execution didn't have the expected result");
 			r.complete();
 		}
 	}

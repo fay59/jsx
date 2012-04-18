@@ -664,8 +664,8 @@ Recompiler.formatHex = function(address, length)
 		return panic("lwr is not implemented", this.address - 4);
 	});
 	
-	impl("mfc0", function(t, d) { // t is the cop0 reg, d is the gpr
-		return gpr(d) + " = this.cop0_reg[" + t + "];\n";
+	impl("mfc0", function(t, l) { // t is the gpr, l is the cop0 reg
+		return gpr(t) + " = this.cop0_reg[" + l + "];\n";
 	});
 	
 	impl("mfc2", function() {

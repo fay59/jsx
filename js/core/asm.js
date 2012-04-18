@@ -23,6 +23,9 @@ Assembler.intifyValue = function(x, group)
 		case 't':
 			return Assembler.registerNames[x];
 		
+		case 'l':
+			return Assembler.cop0RegisterNames[x];
+		
 		case 'i<<2':
 			return parseInt(x, 16) >>> 2;
 		

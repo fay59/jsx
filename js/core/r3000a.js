@@ -98,8 +98,9 @@ R3000a.prototype.hardwareReset = function()
 	this.gpr[32] = 0;
 	this.gpr[33] = 0;
 	
+	// values taken from pSX's debugger at reset
 	this.cop0_reg[12] = 0x00400002;
-	this.cop0_reg[15] = 0x00000002;
+	this.cop0_reg[15] = 0x00000230;
 }
 
 // this should be merged with hardwareReset, really
