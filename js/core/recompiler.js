@@ -800,18 +800,17 @@ Recompiler.formatHex = function(address, length)
 		return panic("sllv is not implemented", this.address - 4);
 	});
 	
-	impl("slt", function() {
-		countUnimplemented.call(this, "slt");
-		return panic("slt is not implemented", this.address - 4);
+	impl("slt", function(s, t, d) {
+		return gpr(d) + " = (" + gpr(s) + " | 0) < (" + gpr(t) + " | 0);\n";
 	});
 	
 	impl("slti", function(s, t, i) {
 		return gpr(t) + " = " + gpr(s) + " < " + signExt(i, 16) + ";\n";
 	});
 	
-	impl("sltiu", function() {
+	impl("sltiu", function(s, t, i) {
 		countUnimplemented.call(this, "sltiu");
-		return panic("sltiu is not implemented", this.address - 4);
+		return gpr(t) + " = " + gpr(s) + " < " + i + ";\n";
 	});
 	
 	impl("sltu", function(s, t, d) {

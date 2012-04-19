@@ -412,6 +412,17 @@ var Tests = {
 			}
 		},
 		
+		"slt": function(r)
+		{
+			var cpu = perform([
+				"lui t0, ffff",
+				"lui t1, 7fff",
+				"slt at, t0, t1"]);
+			with (Assembler.registerNames)
+				r.assert(cpu.gpr[at] == 1, "execution didn't have the expected result");
+			r.complete();
+		},
+		
 		"sltu": {
 			"false result": function(r)
 			{
@@ -434,6 +445,16 @@ var Tests = {
 					r.assert(cpu.gpr[at] == 0, "execution didn't have the expected result");
 				r.complete();
 			}
+		},
+		
+		"sltiu": function(r)
+		{
+			with (Assembler.registerNames)
+			{
+				var cpu = perform(["sltiu at, v0, " + v1]);
+				r.assert(cpu.gpr[at] == (cpu.gpr[v0] < v1), "execution didn't have the expected result");
+			}
+			r.complete();
 		},
 		
 		"slti": {
