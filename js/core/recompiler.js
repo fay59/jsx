@@ -807,9 +807,8 @@ Recompiler.formatHex = function(address, length)
 		return panic("slt is not implemented", this.address - 4);
 	});
 	
-	impl("slti", function() {
-		countUnimplemented.call(this, "slti");
-		return panic("slti is not implemented", this.address - 4);
+	impl("slti", function(s, t, i) {
+		return gpr(t) + " = " + gpr(s) + " < " + signExt(i, 16) + ";\n";
 	});
 	
 	impl("sltiu", function() {

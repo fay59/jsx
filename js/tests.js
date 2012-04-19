@@ -408,6 +408,28 @@ var Tests = {
 			}
 		},
 		
+		"slti": {
+			"positive immediate": function(r)
+			{
+				with (Assembler.registerNames)
+				{
+					var cpu = perform(["slti at, v0, " + v1]);
+					r.assert(cpu.gpr[at] == (cpu.gpr[v0] < v1), "execution didn't have the expected result");
+				}
+				r.complete();
+			},
+			
+			"negative immediate": function(r)
+			{
+				with (Assembler.registerNames)
+				{
+					var cpu = perform(["slti at, v0, ffff"]);
+					r.assert(cpu.gpr[at] == (cpu.gpr[v0] < (0xffffffff | 0)), "execution didn't have the expected result");
+				}
+				r.complete();
+			}
+		},
+		
 		"or": function(r)
 		{
 			var cpu = perform(["or at, t6, t8"]);
