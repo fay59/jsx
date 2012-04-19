@@ -375,7 +375,7 @@ Recompiler.formatHex = function(address, length)
 		return jsCode;
 	}
 	
-	function load(bits, addressReg, offset, into)
+	function load(bits, addressReg, offset, into, signedLoad)
 	{
 		if (bits === undefined || addressReg === undefined || offset === undefined || into === undefined)
 			this.panic("undefined argument");
@@ -384,8 +384,15 @@ Recompiler.formatHex = function(address, length)
 		offset = signExt(offset, 16);
 		address += " + " + offset;
 		
-		var jsCode = gpr(into) + " = this.memory.read" + bits + "(" + address + ")\n";
-		return jsCode;
+		if (signedLoad)
+		{
+			var shift = 32 - bits;
+			return gpr(into) + " = (this.memory.read" + bits + "(" + address + ") << " + shift + ") >> " + shift + ";\n";
+		}
+		else
+		{
+			return gpr(into) + " = this.memory.read" + bits + "(" + address + ");\n";
+		}
 	}
 	
 	function store(bits, addressReg, offset, value)
@@ -622,12 +629,11 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("lb", function(s, t, i) {
-		return load(8, s, i, t);
+		return load(8, s, i, t, true);
 	});
 	
-	impl("lbu", function() {
-		countUnimplemented.call(this, "lbu");
-		return panic("lbu is not implemented", this.address - 4);
+	impl("lbu", function(s, t, i) {
+		return load(8, s, i, t, false);
 	});
 	
 	impl("lh", function() {
