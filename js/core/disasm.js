@@ -202,7 +202,7 @@ Disassembler.patternData = {
 	},
 	'div': {	// divide word
 		pattern: '0000 00ss ssst tttt 0000 0000 0001 1010',
-		format: 'div {t}, {s}'
+		format: 'div {s}, {t}'
 	},
 	'divu': {	// divide unsigned word
 		pattern: '0000 00ss ssst tttt 0000 0000 0001 1011',

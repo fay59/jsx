@@ -279,6 +279,17 @@ var Tests = {
 			}
 		},
 		
+		"div": function(r)
+		{
+			var cpu = perform(["div t8, v0"]);
+			with (Assembler.registerNames)
+			{
+				r.assert(cpu.gpr[32] == t8 % v0, "execution didn't have the expected result");
+				r.assert(cpu.gpr[33] == Math.floor(t8 / v0), "execution didn't have the expected result");
+			}
+			r.complete();
+		},
+		
 		"lb/lbu": {
 			"lui, ori, sw, lbu (with unsigned value)": function(r)
 			{

@@ -559,9 +559,10 @@ Recompiler.formatHex = function(address, length)
 		return panic("dpcl is not implemented", this.address - 4);
 	});
 	
-	impl("div", function() {
-		countUnimplemented.call(this, "div");
-		return panic("div is not implemented", this.address - 4);
+	impl("div", function(s, t) {
+		var jsCode = "this.gpr[32] = (" + gpr(s) + " | 0) % (" + gpr(t) + " | 0);\n";
+		jsCode += "this.gpr[33] = (" + gpr(s) + " | 0) / (" + gpr(t) + " | 0);\n";
+		return jsCode;
 	});
 	
 	impl("divu", function() {
