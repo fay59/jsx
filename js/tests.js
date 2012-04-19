@@ -325,6 +325,23 @@ var Tests = {
 			}
 		},
 		
+		"lh": function(r)
+		{
+				var cpu = perform([
+					"lui at, dead",
+					"ori at, at, beef",
+					"sw at, r0+0",
+					"lh t0, r0+0"]);
+				
+				with (Assembler.registerNames)
+				{
+					r.assert(cpu.gpr[at] == 0xdeadbeef, "lui/ori pair didn't load the correct value");
+					r.assert(cpu.memory.read32(0) == 0xdeadbeef, "sw didn't write the correct value");
+					r.assert(cpu.gpr[t0] == 0xffffbeef, "lh didn't load the correct value");
+				}
+				r.complete()
+		},
+		
 		"sb": function(r)
 		{
 			var cpu = perform([

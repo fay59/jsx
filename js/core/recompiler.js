@@ -637,9 +637,8 @@ Recompiler.formatHex = function(address, length)
 		return load(8, s, i, t, false);
 	});
 	
-	impl("lh", function() {
-		countUnimplemented.call(this, "lh");
-		return panic("lh is not implemented", this.address - 4);
+	impl("lh", function(s, t, i) {
+		return load(16, s, i, t, true);
 	});
 	
 	impl("lhu", function() {
