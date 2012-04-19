@@ -17,6 +17,7 @@ var R3000a = function()
 	this.stopped = false;
 	this.memory = null;
 	this.recompiler = new Recompiler();
+	this.ticks = 0;
 	
 	this.diags = console;
 	
@@ -152,7 +153,7 @@ R3000a.prototype.writeCOP0 = function(reg, value)
 
 R3000a.prototype.clock = function(ticks)
 {
-	// TODO timer
+	this.ticks += ticks;
 }
 
 R3000a.prototype.execute = function(address, context)

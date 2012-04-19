@@ -57,28 +57,13 @@ var Debugger = function(cpu)
 	this.cpu.recompiler.injector = {
 		injectBefore: function(address, opcode)
 		{
-			if (opcode.instruction.name == 'jal')
+			if (opcode.instruction.name == 'jal' || opcode.instruction.name == 'jalr')
 			{
-				var segmentPrefix = (address - 4) & 0xF0000000;
-				var targetWord = opcode.params[0] << 2;
-				var jumpAddress = Recompiler.unsign(segmentPrefix | targetWord);
-				
-				var jsCode = "context.stack.push(" + jumpAddress + ");\n";
-				jsCode += "context._stepCallback(context.onsteppedinto);\n";
-				return jsCode;
-			}
-			else if (opcode.instruction.name == 'jalr')
-			{
-				var targetReg = opcode.params[0];
-				var jsCode = "context.stack.push(this.gpr[" + targetReg + "]);\n";
-				jsCode += "context._stepCallback(context.onsteppedinto);\n";
-				return jsCode;
+				return "context._enterFunction(0x" + address.toString(16) + ");\n";
 			}
 			else if (opcode.instruction.name == 'jr' && opcode.params[0] == 31)
 			{
-				var jsCode = "context.stack.pop();\n";
-				jsCode += "context._stepCallback(context.onsteppedout);\n";
-				return jsCode;
+				return "context._leaveFunction();\n";
 			}
 		},
 		
@@ -94,7 +79,7 @@ var Debugger = function(cpu)
 Debugger.prototype.reset = function(pc, memory)
 {
 	this.pc = pc;
-	this.stack = [0];
+	this.stack = [this.pc];
 	this.cpu.hardwareReset();
 	this.cpu.softwareReset(memory);
 	
@@ -268,6 +253,18 @@ Debugger.prototype.updateTrace = function()
 	var op = Disassembler.getOpcode(bits);
 	var string = Disassembler.getOpcodeAsString(op);
 	this.trace.push([this.pc, string, this.cpu.registerMemory.slice(0)]);
+}
+
+Debugger.prototype._enterFunction = function(returnAddress)
+{
+	this.stack.push(returnAddress);
+	this._stepCallback(this.onsteppedinto);
+}
+
+Debugger.prototype._leaveFunction = function()
+{
+	this.stack.pop();
+	this._stepCallback(this.onsteppedout);
 }
 
 Debugger.prototype._handleException = function(ex)
