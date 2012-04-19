@@ -41,6 +41,8 @@ var Debugger = function(cpu)
 	{
 		return function(value)
 		{
+			if (!isFinite(value))
+				throw new Error("trying to assign a non-finite value to " + Disassembler.registerNames[i]);
 			regs[i] = value;
 		}
 	};

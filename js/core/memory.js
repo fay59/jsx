@@ -17,7 +17,7 @@ var MemoryMap = function(hardware, parallelPort, bios)
 	
 	this.diags = console;
 	
-	this.ram = new GeneralPurposeBuffer(0x20000);
+	this.ram = new GeneralPurposeBuffer(0x200000);
 	this.scratchpad = new GeneralPurposeBuffer(0x400);
 	
 	this.hardware = hardware;
@@ -25,10 +25,15 @@ var MemoryMap = function(hardware, parallelPort, bios)
 	this.bios = bios;
 	
 	this.ram.offset = 0x00000000;
+	this.ram.zoneName = "RAM";
 	this.scratchpad.offset = 0x1F800000;
+	this.scratchpad.zoneName = "Scratchpad";
 	this.parallelPort.offset = 0x1F000000;
+	this.parallelPort.zoneName = "Parallel Port";
 	this.hardware.offset = 0x1F801000;
+	this.hardware.zoneName = "Hardware registers";
 	this.bios.offset = 0x1FC00000;
+	this.bios.zoneName = "BIOS";
 	
 	const pages = 0x20000000 / 0x1000;
 	this.pageMap = new Array(pages);
@@ -40,16 +45,17 @@ var MemoryMap = function(hardware, parallelPort, bios)
 	
 	for (var i = 0x00000; i < 0x00200; i++) this.pageMap[i] = this.ram;
 	for (var i = 0x00200; i < 0x1F000; i++) this.pageMap[i] = MemoryMap.unmapped;
-	for (var i = 0x1F000; i < 0x1F010; i++) this.pageMap[i] = parallelPort;
+	for (var i = 0x1F000; i < 0x1F010; i++) this.pageMap[i] = this.parallelPort;
 	for (var i = 0x1F010; i < 0x1F800; i++) this.pageMap[i] = MemoryMap.unmapped;
 	this.pageMap[0x1F800] = this.scratchpad;
-	for (var i = 0x1F801; i < 0x1F803; i++) this.pageMap[i] = hardware;
+	for (var i = 0x1F801; i < 0x1F803; i++) this.pageMap[i] = this.hardware;
 	for (var i = 0x1F803; i < 0x1FC00; i++) this.pageMap[i] = MemoryMap.unmapped;
-	for (var i = 0x1FC00; i < 0x1FC80; i++) this.pageMap[i] = bios;
+	for (var i = 0x1FC00; i < 0x1FC80; i++) this.pageMap[i] = this.bios;
 	for (var i = 0x1FC80; i < 0x20000; i++) this.pageMap[i] = MemoryMap.unmapped;
 }
 
 MemoryMap.unmapped = {
+	name: "Unmapped memory",
 	buffer: new ArrayBuffer(0),
 	u8Array: new Uint8Array(this.buffer),
 	u16Array: new Uint16Array(this.buffer),
