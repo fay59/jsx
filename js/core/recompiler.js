@@ -565,9 +565,10 @@ Recompiler.formatHex = function(address, length)
 		return jsCode;
 	});
 	
-	impl("divu", function() {
-		countUnimplemented.call(this, "divu");
-		return panic("divu is not implemented", this.address - 4);
+	impl("divu", function(s, t) {
+		var jsCode = "this.gpr[32] = " + gpr(s) + " % " + gpr(t) + ";\n";
+		jsCode += "this.gpr[33] = " + gpr(s) + " / " + gpr(t) + ";\n";
+		return jsCode;
 	});
 	
 	impl("dpcs", function() {

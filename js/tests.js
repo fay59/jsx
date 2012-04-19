@@ -290,6 +290,25 @@ var Tests = {
 			r.complete();
 		},
 		
+		"divu": function(r)
+		{
+			var bigger = 0xffeff891;
+			var smaller = 0x11224455;
+			var cpu = perform([
+				"lui t0, ffef",
+				"ori t0, t0, f891",
+				"lui t1, 1122",
+				"ori t1, t1, 4455",
+				"divu t0, t1"]);
+			
+			with (Assembler.registerNames)
+			{
+				r.assert(cpu.gpr[32] == bigger % smaller, "execution didn't have the expected result");
+				r.assert(cpu.gpr[33] == Math.floor(bigger / smaller), "execution didn't have the expected result");
+			}
+			r.complete();
+		},
+		
 		"lb/lbu": {
 			"lui, ori, sw, lbu (with unsigned value)": function(r)
 			{

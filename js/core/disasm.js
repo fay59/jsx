@@ -206,7 +206,7 @@ Disassembler.patternData = {
 	},
 	'divu': {	// divide unsigned word
 		pattern: '0000 00ss ssst tttt 0000 0000 0001 1011',
-		format: 'divu {t}, {s}'
+		format: 'divu {s}, {t}'
 	},
 	'dpcs': {	// depth cueing
 		pattern: '0100 1000 0111 1000 0000 0000 0001 0000',
