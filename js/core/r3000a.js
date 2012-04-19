@@ -54,6 +54,25 @@ R3000a.exceptions = {
 	overflow: 12,
 };
 
+R3000a.srFlags = {
+	IEc: 1,
+	KUc: 1 << 1,
+	IEp: 1 << 2,
+	KUp: 1 << 3,
+	IEo: 1 << 4,
+	KUo: 1 << 5,
+	IntMask: 0xF0,
+	IsC: 1 << 16,
+	SwC: 1 << 17,
+	PZ: 1 << 18,
+	CM: 1 << 19,
+	PE: 1 << 20,
+	TS: 1 << 21,
+	BEV: 1 << 22,
+	RE: 1 << 24,
+	CU: 0xF0000000
+};
+
 R3000a.prototype.setDiagnosticsOutput = function(diags)
 {
 	this.diags = diags;
@@ -113,8 +132,22 @@ R3000a.prototype.softwareReset = function(memory, cdrom)
 
 R3000a.prototype.writeCOP0 = function(reg, value)
 {
-	// TODO complex stuff
+	var oldValue = this.cop0_reg[reg];
 	this.cop0_reg[reg] = value;
+	
+	switch (reg)
+	{
+		case 12: // SR
+		{
+			// IsC
+			if ((oldValue & R3000a.srFlags.IsC) && !(value & R3000a.srFlags.IsC))
+				this.memory = this.memory.hidden;
+			else if (!(oldValue & R3000a.srFlags.IsC) && (value & R3000a.srFlags.IsC))
+				this.memory = new MemoryCache(this.memory);
+			
+			break;
+		}
+	}
 }
 
 R3000a.prototype.clock = function(ticks)

@@ -495,9 +495,8 @@ Recompiler.formatHex = function(address, length)
 		return branch.call(this, gpr(s) + " > 0", i);
 	});
 	
-	impl("blez", function() {
-		countUnimplemented.call(this, "blez");
-		return panic("blez is not implemented", this.address - 4);
+	impl("blez", function(s, i) {
+		return branch.call(this, gpr(s) + " <= 0", i);
 	});
 	
 	impl("bltz", function(s, i) {

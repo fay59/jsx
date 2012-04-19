@@ -10,6 +10,21 @@ var GeneralPurposeBuffer = function(size)
 	this.u32 = new Uint32Array(this.buffer);
 }
 
+var MemoryCache = function(memory)
+{
+	// just hide stuff till IsC goes out in the SR
+	this.hidden = memory;
+}
+
+MemoryCache.returnZero = function() { return 0; }
+
+MemoryCache.prototype.read8 = MemoryCache.returnZero;
+MemoryCache.prototype.read16 = MemoryCache.returnZero;
+MemoryCache.prototype.read32 = MemoryCache.returnZero;
+MemoryCache.prototype.write8 = MemoryCache.returnZero;
+MemoryCache.prototype.write16 = MemoryCache.returnZero;
+MemoryCache.prototype.write32 = MemoryCache.returnZero;
+
 var MemoryMap = function(hardware, parallelPort, bios)
 {
 	if (hardware == undefined || parallelPort == undefined || bios == undefined)
