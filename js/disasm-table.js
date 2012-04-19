@@ -16,10 +16,8 @@ DisassemblyTable.prototype.select = function(pc)
 		
 		if (key < pc) row.classList.add("before");
 		else if (key > pc) row.classList.add("after");
-		else if (key == pc)
-		{
+		else
 			this.table.scrollTop = row.offsetTop - 20;
-		}
 	}
 }
 
