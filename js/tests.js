@@ -144,6 +144,21 @@ var Tests = {
 			verify(parallel.u16);
 			verify(parallel.u32);
 			r.complete();
+		},
+		
+		"Read-write ping-pong in RAM area": function(r)
+		{
+			var bios = new GeneralPurposeBuffer(0x80000);
+			var hardwareRegisters = new HardwareRegisters();
+			var parallelPort = new ParallelPortMemoryRange();
+			var memory = new MemoryMap(hardwareRegisters, parallelPort, bios);
+			
+			memory.write32(4, 0xdeadbeef);
+			r.assert(memory.read8(4) == 0xef);
+			r.assert(memory.read8(5) == 0xbe);
+			r.assert(memory.read8(6) == 0xad);
+			r.assert(memory.read8(7) == 0xde);
+			r.complete();
 		}
 	},
 	
@@ -192,38 +207,42 @@ var Tests = {
 			// TODO test for overflows
 		},
 		
-		"addi with positive immediate": function(r)
-		{
-			var cpu = perform(["addi v0, r0, 1111"]);
-			with (Assembler.registerNames)
-				r.assert(cpu.gpr[v0] == 0x1111, "execution didn't have the expected result");
-			r.complete();
-			// TODO test for overflows
+		"addi": {
+			"positive immediate": function(r)
+			{
+				var cpu = perform(["addi v0, r0, 1111"]);
+				with (Assembler.registerNames)
+					r.assert(cpu.gpr[v0] == 0x1111, "execution didn't have the expected result");
+				r.complete();
+				// TODO test for overflows
+			},
+			
+			"negative immediate": function(r)
+			{
+				var cpu = perform(["addi v0, r0, -1111"]);
+				with (Assembler.registerNames)
+					r.assert((cpu.gpr[v0] | 0) == -0x1111, "execution didn't have the expected result");
+				r.complete();
+				// TODO test for overflows
+			}
 		},
 		
-		"addi with negative immediate": function(r)
-		{
-			var cpu = perform(["addi v0, r0, -1111"]);
-			with (Assembler.registerNames)
-				r.assert((cpu.gpr[v0] | 0) == -0x1111, "execution didn't have the expected result");
-			r.complete();
-			// TODO test for overflows
-		},
-		
-		"addiu with positive immediate": function(r)
-		{
-			var cpu = perform(["addiu v0, r0, 1111"]);
-			with (Assembler.registerNames)
-				r.assert(cpu.gpr[v0] == 0x1111, "execution didn't have the expected result");
-			r.complete();
-		},
-		
-		"addiu with negative immediate": function(r)
-		{
-			var cpu = perform(["addiu v0, r0, -1111"]);
-			with (Assembler.registerNames)
-				r.assert((cpu.gpr[v0] | 0) == -0x1111, "execution didn't have the expected result");
-			r.complete();
+		"addiu": {
+			"positive immediate": function(r)
+			{
+				var cpu = perform(["addiu v0, r0, 1111"]);
+				with (Assembler.registerNames)
+					r.assert(cpu.gpr[v0] == 0x1111, "execution didn't have the expected result");
+				r.complete();
+			},
+			
+			"negative immediate": function(r)
+			{
+				var cpu = perform(["addiu v0, r0, -1111"]);
+				with (Assembler.registerNames)
+					r.assert((cpu.gpr[v0] | 0) == -0x1111, "execution didn't have the expected result");
+				r.complete();
+			}
 		},
 		
 		"addu": function(r)
@@ -242,20 +261,22 @@ var Tests = {
 			r.complete();
 		},
 		
-		"andi with positive immediate": function(r)
-		{
-			var cpu = perform(["andi v0, t8, 148c"]);
-			with (Assembler.registerNames)
-				r.assert(cpu.gpr[v0] == (t8 & 0x148c), "execution didn't have the expected result");
-			r.complete();
-		},
-		
-		"andi with negative immediate": function(r)
-		{
-			var cpu = perform(["andi v0, t8, -148c"]);
-			with (Assembler.registerNames)
-				r.assert(cpu.gpr[v0] == (t8 & -0x148c), "execution didn't have the expected result");
-			r.complete();
+		"andi": {
+			"positive immediate": function(r)
+			{
+				var cpu = perform(["andi v0, t8, 148c"]);
+				with (Assembler.registerNames)
+					r.assert(cpu.gpr[v0] == (t8 & 0x148c), "execution didn't have the expected result");
+				r.complete();
+			},
+			
+			"negative immediate": function(r)
+			{
+				var cpu = perform(["andi v0, t8, -148c"]);
+				with (Assembler.registerNames)
+					r.assert(cpu.gpr[v0] == (t8 & -0x148c), "execution didn't have the expected result");
+				r.complete();
+			}
 		},
 		
 		"lui, ori, sw, lb": function(r)
@@ -299,42 +320,46 @@ var Tests = {
 			r.complete();
 		},
 		
-		"subu with positive result": function(r)
-		{
-			var cpu = perform(["subu at, t7, t0"]);
-			with (Assembler.registerNames)
-				r.assert(cpu.gpr[at] == (t7 - t0), "execution didn't have the expected result");
-			r.complete();
+		"subu": {
+			"positive result": function(r)
+			{
+				var cpu = perform(["subu at, t7, t0"]);
+				with (Assembler.registerNames)
+					r.assert(cpu.gpr[at] == (t7 - t0), "execution didn't have the expected result");
+				r.complete();
+			},
+			
+			"negative result": function(r)
+			{
+				var cpu = perform(["subu at, t0, t7"]);
+				with (Assembler.registerNames)
+					r.assert((cpu.gpr[at] | 0) == (t0 - t7), "execution didn't have the expected result");
+				r.complete();
+			}
 		},
 		
-		"subu with negative result": function(r)
-		{
-			var cpu = perform(["subu at, t0, t7"]);
-			with (Assembler.registerNames)
-				r.assert((cpu.gpr[at] | 0) == (t0 - t7), "execution didn't have the expected result");
-			r.complete();
-		},
-		
-		"sltu with false result": function(r)
-		{
-			var cpu = perform([
-				"ori t0, r0, 4000",
-				"ori t1, r0, 5000",
-				"sltu at, t0, t1"]);
-			with (Assembler.registerNames)
-				r.assert(cpu.gpr[at] == 1, "execution didn't have the expected result");
-			r.complete();
-		},
-		
-		"sltu with true result": function(r)
-		{
-			var cpu = perform([
-				"ori t0, r0, 5000",
-				"ori t1, r0, 4000",
-				"sltu at, t0, t1"]);
-			with (Assembler.registerNames)
-				r.assert(cpu.gpr[at] == 0, "execution didn't have the expected result");
-			r.complete();
+		"sltu": {
+			"false result": function(r)
+			{
+				var cpu = perform([
+					"ori t0, r0, 4000",
+					"ori t1, r0, 5000",
+					"sltu at, t0, t1"]);
+				with (Assembler.registerNames)
+					r.assert(cpu.gpr[at] == 1, "execution didn't have the expected result");
+				r.complete();
+			},
+			
+			"true result": function(r)
+			{
+				var cpu = perform([
+					"ori t0, r0, 5000",
+					"ori t1, r0, 4000",
+					"sltu at, t0, t1"]);
+				with (Assembler.registerNames)
+					r.assert(cpu.gpr[at] == 0, "execution didn't have the expected result");
+				r.complete();
+			}
 		},
 		
 		"or": function(r)
@@ -367,40 +392,41 @@ var Tests = {
 	}
 };
 
-document.addEventListener('DOMContentLoaded', function()
+function runTestSuite(name, suite, parentElement, depth)
 {
-	for (var key in Tests)
+	var li = document.createElement('li');
+	if (suite.call !== undefined)
 	{
-		var div = document.createElement('div');
-		var title = document.createElement('h2');
-		var list = document.createElement('ul');
+		li.textContent = name + ": ";
+		var message = document.createElement('span');
+		message.textContent = "...";
+		li.appendChild(message);
 		
-		title.textContent = key;
-		div.className = 'test-cat';
-		
-		div.appendChild(title);
-		div.appendChild(list);
-		document.body.appendChild(div);
-		
-		var tests = Tests[key];
-		for (var testName in tests)
-		{
-			var result = document.createElement('li');
-			result.textContent = testName + ": ";
-			list.appendChild(result);
-			
-			var message = document.createElement('span');
-			result.appendChild(message);
-			
+		setTimeout(function() {
 			var result = new TestResult(message);
-			try
-			{
-				tests[testName](result);
-			}
-			catch (e)
-			{
-				result.fail(e.toString());
-			}
-		}
+			try { suite(result); }
+			catch (e) { result.fail(e.toString()); }
+		}, 0);
 	}
-});
+	else
+	{
+		var h = document.createElement('h' + depth);
+		h.textContent = name;
+		li.appendChild(h);
+		
+		var ul = document.createElement('ul');
+		for (var key in suite)
+			runTestSuite(key, suite[key], ul, depth + 1);
+		li.appendChild(ul);
+	}
+	parentElement.appendChild(li);
+}
+
+function runTests()
+{
+	var ul = document.createElement("ul");
+	runTestSuite("JSX Test Suite", Tests, ul, 1);
+	document.body.appendChild(ul);
+}
+
+document.addEventListener('DOMContentLoaded', runTests);

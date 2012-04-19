@@ -156,16 +156,19 @@ Debugger.prototype.stepOver = function()
 {
 	this.updateTrace();
 	
-	// jr ra must be manually implemented
+	// jr must be manually implemented
 	var bits = this.cpu.memory.read32(this.pc);
 	var opcode = Disassembler.getOpcode(bits);
-	if (opcode.instruction.name == "jr" && opcode.params[0] == 31)
+	if (opcode.instruction.name == "jr")
 	{
 		// execute the delay slot then return
 		this.cpu.executeOne(this.pc + 4, this);
-		this.pc = this.cpu.gpr[31];
-		this.stack.pop();
-		this._stepCallback(this.onsteppedout);
+		this.pc = this.cpu.gpr[opcode.params[0]];
+		if (opcode.params[0] == 31)
+		{
+			this.stack.pop();
+			this._stepCallback(this.onsteppedout);
+		}
 	}
 	else
 	{
