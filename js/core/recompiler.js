@@ -786,11 +786,11 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("sb", function(s, t, i) {
-		return store(8, t, i, s);
+		return store(8, s, i, t);
 	});
 	
 	impl("sh", function(s, t, i) {
-		return store(16, t, i, s);
+		return store(16, s, i, t);
 	});
 	
 	impl("sll", function(t, d, i) { // why does it have an 's' register?

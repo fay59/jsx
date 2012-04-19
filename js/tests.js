@@ -279,35 +279,65 @@ var Tests = {
 			}
 		},
 		
-		"lui, ori, sw, lbu (with unsigned value)": function(r)
-		{
-			var cpu = perform([
-				"lui at, dead",
-				"ori at, at, beef",
-				"sw at, r0+0",
-				"lbu t0, r0+0"]);
-			
-			with (Assembler.registerNames)
+		"lb/lbu": {
+			"lui, ori, sw, lbu (with unsigned value)": function(r)
 			{
-				r.assert(cpu.gpr[at] == 0xdeadbeef, "lui/ori pair didn't load the correct value");
-				r.assert(cpu.memory.read32(0) == 0xdeadbeef, "sw didn't write the correct value");
-				r.assert(cpu.gpr[t0] == 0xef, "lbu didn't load the correct value");
+				var cpu = perform([
+					"lui at, dead",
+					"ori at, at, beef",
+					"sw at, r0+0",
+					"lbu t0, r0+0"]);
+				
+				with (Assembler.registerNames)
+				{
+					r.assert(cpu.gpr[at] == 0xdeadbeef, "lui/ori pair didn't load the correct value");
+					r.assert(cpu.memory.read32(0) == 0xdeadbeef, "sw didn't write the correct value");
+					r.assert(cpu.gpr[t0] == 0xef, "lbu didn't load the correct value");
+				}
+				r.complete()
+			},
+			
+			"ori, sw, lb (with signed value)": function(r)
+			{
+				var cpu = perform([
+					"ori at, r0, ff",
+					"sw at, r0+0",
+					"lb t0, r0+0"]);
+				
+				with (Assembler.registerNames)
+				{
+					r.assert(cpu.gpr[at] == 0xff, "ori operation didn't load the correct value");
+					r.assert(cpu.memory.read32(0) == 0xff, "sw didn't write the correct value");
+					r.assert(cpu.gpr[t0] == 0xffffffff, "lb didn't load the correct value");
+				}
+				r.complete()
 			}
-			r.complete()
 		},
 		
-		"ori, sw, lb (with signed value)": function(r)
+		"sb": function(r)
 		{
 			var cpu = perform([
-				"ori at, r0, ff",
-				"sw at, r0+0",
-				"lb t0, r0+0"]);
+				"ori at, r0, 0xff",
+				"sb at, r0+0"]);
 			
 			with (Assembler.registerNames)
 			{
 				r.assert(cpu.gpr[at] == 0xff, "ori operation didn't load the correct value");
-				r.assert(cpu.memory.read32(0) == 0xff, "sw didn't write the correct value");
-				r.assert(cpu.gpr[t0] == 0xffffffff, "lb didn't load the correct value");
+				r.assert(cpu.memory.read8(0) == 0xff, "sb didn't write the correct value");
+			}
+			r.complete()
+		},
+		
+		"sh": function(r)
+		{
+			var cpu = perform([
+				"ori at, r0, 0xffff",
+				"sh at, r0+0"]);
+			
+			with (Assembler.registerNames)
+			{
+				r.assert(cpu.gpr[at] == 0xffff, "ori operation didn't load the correct value");
+				r.assert(cpu.memory.read16(0) == 0xffff, "sh didn't write the correct value");
 			}
 			r.complete()
 		},
