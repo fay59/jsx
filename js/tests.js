@@ -467,6 +467,28 @@ var Tests = {
 			with (Assembler.cop0RegisterNames)
 				r.assert(cpu.gpr[v0] == cpu.cop0_reg[SR], "execution didn't have the expected result");
 			r.complete();
+		},
+		
+		"mfhi": function(r)
+		{
+			var cpu = perform([
+				"div t8, k0",
+				"mfhi at"]);
+			
+			with (Assembler.registerNames)
+				r.assert(cpu.gpr[at] == t8 % k0, "execution didn't have the expected result");
+			r.complete();
+		},
+		
+		"mflo": function(r)
+		{
+			var cpu = perform([
+				"div t8, k0",
+				"mflo at"]);
+			
+			with (Assembler.registerNames)
+				r.assert(cpu.gpr[at] == Math.floor(t8 / k0), "execution didn't have the expected result");
+			r.complete();
 		}
 	}
 };

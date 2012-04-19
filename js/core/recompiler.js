@@ -679,14 +679,12 @@ Recompiler.formatHex = function(address, length)
 		return panic("mfc2 is not implemented", this.address - 4);
 	});
 	
-	impl("mfhi", function() {
-		countUnimplemented.call(this, "mfhi");
-		return panic("mfhi is not implemented", this.address - 4);
+	impl("mfhi", function(d) {
+		return gpr(d) + " = this.gpr[32];\n";
 	});
 	
-	impl("mflo", function() {
-		countUnimplemented.call(this, "mflo");
-		return panic("mflo is not implemented", this.address - 4);
+	impl("mflo", function(d) {
+		return gpr(d) + " = this.gpr[33];\n";
 	});
 	
 	impl("mtc0", function(t, l) {
