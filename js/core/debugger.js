@@ -81,11 +81,12 @@ var Debugger = function(cpu)
 				return jsCode;
 			}
 		},
+		
 		injectAfter: function(address, opcode)
 		{
 			var nextAddress = address + 4;
 			if (self.breakpoints.indexOf(nextAddress) != -1)
-				return "throw new Breakpoint(0x" + Recompiler.formatHex(nextAddress) + ");\n";
+				return "throw new Breakpoint(" + nextAddress + ");\n";
 		}
 	};
 }

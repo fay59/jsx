@@ -90,7 +90,7 @@ R3000a.prototype.panic = function(message, pc)
 // used from the WebKit debugger when something goes terribly wrong
 R3000a.prototype.__crash = function()
 {
-	this.diags.error("crashing the n64 engine");
+	this.diags.error("crashing the PSX engine");
 	// this should do it
 	this.gpr = null;
 	this.fgr = null;

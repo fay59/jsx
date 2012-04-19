@@ -279,6 +279,23 @@ var Tests = {
 			}
 		},
 		
+		"Branching": function(r)
+		{
+			var cpu = perform([
+				"or at, r0, 0",
+				"ori t0, r0, 40", // 0x40 == 64
+				"addiu t0, t0, ffff",
+				"bne t0, r0, 3fff8", // -2 instructions
+				"addiu at, at, ffff"]);
+			
+			with (Assembler.registerNames)
+			{
+				r.assert(cpu.gpr[t0] == 0, "loop didn't bring t0 to 0");
+				r.assert((cpu.gpr[at] | 0) == -64, "delay slot didn't execute correctly");
+			}
+			r.complete();
+		},
+		
 		"div": function(r)
 		{
 			var cpu = perform(["div t8, v0"]);

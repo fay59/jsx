@@ -115,9 +115,9 @@ Recompiler.prototype.addLabel = function(label, opAddress)
 	if (op != null)
 	{
 		var firstLetter = op.instruction.name[0];
-		if (firstLetter == 'b' || firstLetter == 'j')
+		if (firstLetter == 'j')
 		{
-			var message = "label " + labelString + " from " + opAddressString + " falling into the delay slot of a branch"
+			var message = "label " + labelString + " from " + opAddressString + " falling into the delay slot of a jump";
 			this.diags.warn(message);
 		}
 	}
@@ -438,11 +438,14 @@ Recompiler.formatHex = function(address, length)
 		this.addLabel(targetAddress, opAddress);
 		
 		var jsCode = "condition = " + condition + ";\n";
-		jsCode += delaySlot.call(this);
+		
 		jsCode += "if (condition) {\n";
+		jsCode += delaySlot.call(this);
 		jsCode += "pc = " + hex(targetAddress) + ";\n";
 		jsCode += "break;\n";
 		jsCode += "}\n";
+		this.address -= 4;
+		
 		return jsCode;
 	}
 	
@@ -520,8 +523,7 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("break", function() {
-		countUnimplemented.call(this, "break");
-		return panic("break is not implemented", this.address - 4);
+		return panic("breakpoint hit");
 	});
 	
 	impl("cc", function() {
