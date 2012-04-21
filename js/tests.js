@@ -197,6 +197,22 @@ var Tests = {
 		}
 	},
 	
+	"System Behavior": {
+		"Cache Isolation": function(r)
+		{
+			var cpu = perform([
+				"lui at, " + (R3000a.srFlags.IsC >>> 16).toString(16),
+				"mtc0 at, SR",
+				"sw t0, r0+0",
+				"mtc0 r0, SR",
+				"lw t0, r0+0"]);
+			
+			with (Assembler.registerNames)
+				r.assert(cpu.gpr[t0] == 0, "cache isolation is not doing its job");
+			r.complete();
+		}
+	},
+	
 	"Instructions": {
 		"add": function(r)
 		{
