@@ -579,6 +579,30 @@ var Tests = {
 			with (Assembler.registerNames)
 				r.assert(cpu.gpr[at] == Math.floor(t8 / k0), "execution didn't have the expected result");
 			r.complete();
+		},
+		
+		"All instructions imlemented": function(r)
+		{
+			var missingInstructions = [];
+			var instructionCount = 0;
+			var recompiler = new Recompiler();
+			recompiler.memory = new MemoryCache(null);
+			recompiler.unimplementedInstructionCounts = {};
+			for (var instruction in Disassembler.patternData)
+			{
+				var jsCode = recompiler[instruction].call(recompiler, 0, 0, 0);
+				if (jsCode.indexOf("is not implemented") != -1)
+					missingInstructions.push(instruction);
+				
+				instructionCount++;
+			}
+			
+			if (missingInstructions.length == 0)
+				r.complete();
+			else if (missingInstructions.length == 1)
+				r.fail(missingInstructions + " is missing");
+			else
+				r.fail(missingInstructions.join(", ") + " are missing");
 		}
 	}
 };

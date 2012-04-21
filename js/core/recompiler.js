@@ -104,9 +104,12 @@ Recompiler.prototype.addLabel = function(label, opAddress)
 	var opAddressString = Recompiler.formatHex(opAddress);
 	
 	// check that the location actually exists
-	var translated = this.memory.translate(label);
-	if (translated.buffer == MemoryMap.unmapped)
-		this.panic("branch or jump to unmapped location " + labelString + " from address " + opAddressString);
+	if (this.memory.translate)
+	{
+		var translated = this.memory.translate(label);
+		if (translated.buffer == MemoryMap.unmapped)
+			this.panic("branch or jump to unmapped location " + labelString + " from address " + opAddressString);
+	}
 		
 	// check that the label is not in a delay slot
 	// just warn if so, because the previous word is possibly not an instruction
@@ -142,9 +145,12 @@ Recompiler.prototype.match = function(instruction)
 
 Recompiler.prototype.nextInstruction = function()
 {
-	var translated = this.memory.translate(this.address);
-	if (translated.buffer == MemoryMap.unmapped)
-		this.panic("accessing invalid memory address " + Recompiler.formatHex(this.address));
+	if (this.memory.translate)
+	{
+		var translated = this.memory.translate(this.address);
+		if (translated.buffer == MemoryMap.unmapped)
+			this.panic("accessing invalid memory address " + Recompiler.formatHex(this.address));
+	}
 	
 	var pattern = this.memory.read32(this.address);
 	var op = Disassembler.getOpcode(pattern);
