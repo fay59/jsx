@@ -88,7 +88,7 @@ R3000a.prototype.panic = function(message, pc)
 	throw new ExecutionException(message, pc);
 }
 
-// used from the WebKit debugger when something goes terribly wrong
+// to use from the WebKit debugger when something goes terribly wrong
 R3000a.prototype.__crash = function()
 {
 	this.diags.error("crashing the PSX engine");

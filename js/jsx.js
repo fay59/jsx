@@ -1,5 +1,7 @@
-document.addEventListener('DOMContentLoaded', function()
-{
+document.addEventListener("DOMContentLoaded", including.bind(null,
+	"js/core/disasm.js", "js/core/r3000a.js", "js/core/memory.js", "js/core/recompiler.js",
+	function()
+	{
 	var status = new StatusQueue(document.getElementById("status"));
 	
 	function fail(message)
@@ -15,6 +17,13 @@ document.addEventListener('DOMContentLoaded', function()
 		
 		screen.parentNode.replaceChild(sadDiv, screen);
 		document.getElementById("rom-picker").disabled = "disabled";
+	}
+	
+	// check for Function.bind
+	if (Function.prototype.bind === undefined)
+	{
+		fail("Your browser does not support partial function application.");
+		return;
 	}
 	
 	// check for typed arrays
@@ -93,4 +102,4 @@ document.addEventListener('DOMContentLoaded', function()
 	});
 	
 	status.display("← Waiting for a BIOS and an ISO...");
-});
+	}));

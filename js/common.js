@@ -1,3 +1,56 @@
+function including()
+{
+	var scriptCount = 0;
+	var callback = null;
+	
+	function callbackCountdown()
+	{
+		scriptCount--;
+		if (scriptCount == 0)
+			callback();
+	}
+	
+	for (var i = 0; i < arguments.length; i++)
+	{
+		var arg = arguments[i];
+		if (arg.call !== undefined)
+		{
+			callback = arg;
+			break;
+		}
+		
+		scriptCount++;
+		var script = document.createElement("script");
+		script.type = "text/javascript";
+		script.src = arguments[i];
+		script.addEventListener("load", callbackCountdown);
+		document.head.appendChild(script);
+	}
+	
+	if (scriptCount == 0)
+	{
+		setTimeout(callback, 0);
+		return;
+	}
+}
+
+// this needs to work to at least display a decent error message
+if (including.bind === undefined)
+{
+	including.bind = function()
+	{
+		var self = arguments[0];
+		var args = Array.prototype.slice.call(arguments, 1);
+		
+		return function()
+		{
+			for (var i = 0; i < arguments.length; i++)
+				args.push(arguments[i]);
+			including.apply(self, args);
+		}
+	}
+}
+
 var StatusQueue = function(element)
 {
 	this.messageQueue = [];

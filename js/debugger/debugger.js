@@ -1,13 +1,3 @@
-var Breakpoint = function(address)
-{
-	this.address = address;
-}
-
-Breakpoint.prototype.toString = function()
-{
-	return "breakpoint at address 0x" + Recompiler.formatHex(this.address);
-}
-
 var Debugger = function(cpu)
 {
 	var pc = R3000a.bootAddress;
@@ -17,15 +7,8 @@ var Debugger = function(cpu)
 	
 	this.stack = [];
 	this.cpu = cpu;
-	this.trace = [];
-	this.running = false;
 	this.diag = console;
-	this.breakpoints = [];
-	
-	this.watchedRegHit = -1;
-	this.watchedRegs = [];
-	for (var i = 0; i < 32; i++)
-		this.watchedRegs.push(false);
+	this.breakpoints = new BreakpointList(cpu);
 	
 	this.onstepped = null;
 	this.onsteppedinto = null;
@@ -70,8 +53,15 @@ var Debugger = function(cpu)
 		injectAfter: function(address, opcode)
 		{
 			var nextAddress = address + 4;
-			if (self.breakpoints.indexOf(nextAddress) != -1)
-				return "throw new Breakpoint(" + nextAddress + ");\n";
+			// in case of a jump, account for the delay slot too
+			if (opcode.instruction.name[0] == "j")
+				nextAddress += 4;
+			
+			if (self.breakpoints.hasEnabledBreakpoint(nextAddress))
+				return "context.breakpoints.hit(" + nextAddress + ");\n";
+			
+			if ((address & 0x1FFFFFFF) == (0xbfc00da0 & 0x1fffffff))
+				return "console.debug('hit 0xbfc00da0');\n";
 		}
 	};
 }
@@ -85,11 +75,6 @@ Debugger.prototype.reset = function(pc, memory)
 	
 	this._stepCallback(this.onstepped);
 	this._stepCallback(this.onsteppedinto);
-}
-
-Debugger.prototype.setWatchRegister = function(index, watch)
-{
-	this.watchedRegs[index] = watch;
 }
 
 Debugger.prototype.getGPR = function(index)
@@ -118,8 +103,7 @@ Debugger.prototype.setBreakpoint = function(breakpoint)
 		throw new Error("breakpoint needs to be defined and numeric");
 	
 	breakpoint = Recompiler.unsign(breakpoint);
-	this.breakpoints.push(breakpoint);
-	this.cpu.invalidate(breakpoint);
+	this.breakpoints.setBreakpoint(breakpoint)
 }
 
 Debugger.prototype.removeBreakpoint = function(breakpoint)
@@ -127,21 +111,11 @@ Debugger.prototype.removeBreakpoint = function(breakpoint)
 	if (!isFinite(breakpoint))
 		throw new Error("breakpoint needs to be defined and numeric");
 	
-	breakpoint = Recompiler.unsign(breakpoint);
-	var index = this.breakpoints.indexOf(breakpoint);
-	if (index != -1)
-	{
-		this.breakpoints.splice(index, 1);
-		this.cpu.invalidate(breakpoint);
-		return true;
-	}
-	return false;
+	this.breakpoints.removeBreakpoint(breakpoint);
 }
 
 Debugger.prototype.stepOver = function()
 {
-	this.updateTrace();
-	
 	// jr must be manually implemented
 	var bits = this.cpu.memory.read32(this.pc);
 	var opcode = Disassembler.getOpcode(bits);
@@ -223,8 +197,7 @@ Debugger.prototype.runUntil = function(desiredPC)
 		throw new Error("desiredPC needs to be defined and finite");
 	
 	desiredPC = Recompiler.unsign(desiredPC);
-	this.breakpoints.push(desiredPC);
-	this.cpu.invalidate(desiredPC);
+	this.breakpoints.addBreakpoint(desiredPC);
 	try
 	{
 		this.cpu.execute(this.pc, this);
@@ -232,6 +205,8 @@ Debugger.prototype.runUntil = function(desiredPC)
 	catch (ex)
 	{
 		this._handleException(ex);
+		if (ex.constructor == Breakpoint.Hit && ex.address == desiredPC)
+			this.breakpoints.removeBreakpoint(desiredPC)
 	}
 }
 
@@ -245,14 +220,6 @@ Debugger.prototype.run = function()
 	{
 		this._handleException(ex);
 	}
-}
-
-Debugger.prototype.updateTrace = function()
-{
-	var bits = this.cpu.memory.read32(this.pc);
-	var op = Disassembler.getOpcode(bits);
-	var string = Disassembler.getOpcodeAsString(op);
-	this.trace.push([this.pc, string, this.cpu.registerMemory.slice(0)]);
 }
 
 Debugger.prototype._enterFunction = function(returnAddress)
@@ -269,9 +236,9 @@ Debugger.prototype._leaveFunction = function()
 
 Debugger.prototype._handleException = function(ex)
 {
-	if (ex.constructor == Breakpoint)
+	if (ex.constructor == Breakpoint.Hit)
 	{
-		this.pc = ex.address;
+		this.pc = ex.breakpoint.address;
 		this.diags.log("stopped at " + this.pc);
 		this._stepCallback(this.onstepped);
 	}

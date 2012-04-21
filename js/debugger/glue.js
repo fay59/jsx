@@ -1,8 +1,11 @@
 var psx = null;
 var dbg = null;
 
-document.addEventListener("DOMContentLoaded", function()
-{
+document.addEventListener("DOMContentLoaded", including.bind(null,
+	"js/core/disasm.js", "js/core/r3000a.js", "js/core/hwregs.js", "js/core/parallel.js",
+	"js/core/memory.js", "js/core/recompiler.js", "js/debugger/debugger.js",
+	"js/debugger/disasm-table.js", "js/debugger/breakpoint.js",
+	function() {
 	const disassemblyLength = 25;
 	
 	var status = new StatusQueue(document.querySelector("#status"));
@@ -328,4 +331,4 @@ document.addEventListener("DOMContentLoaded", function()
 	});
 	
 	status.display("← Waiting for a BIOS...");
-});
+	}));
