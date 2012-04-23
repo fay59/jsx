@@ -2,6 +2,10 @@ var BreakpointList = function(cpu)
 {
 	this.cpu = cpu;
 	this.list = {};
+	this.eventListeners = {
+		"addedbreakpoint": [],
+		"removedbreakpoint": []
+	};
 }
 
 BreakpointList.prototype.hit = function(address)
@@ -22,8 +26,12 @@ BreakpointList.prototype.getBreakpoint = function(address)
 
 BreakpointList.prototype.setBreakpoint = function(address)
 {
+	this.removeBreakpoint(address);
+	
 	this.list[address] = new Breakpoint(address);
 	this.cpu.invalidate(address);
+	this._eventCallback("addedbreakpoint", {breakpoint: this.list[address]});
+	
 	return this.list[address];
 }
 
@@ -31,8 +39,10 @@ BreakpointList.prototype.removeBreakpoint = function(address)
 {
 	if (address in this.list)
 	{
+		var breakpoint = this.list[address];
 		delete this.list[address];
 		this.cpu.invalidate(address);
+		this._eventCallback("removedbreakpoint", {breakpoint: breakpoint});
 	}
 }
 
@@ -44,12 +54,43 @@ BreakpointList.prototype.toggleBreakpoint = function(address)
 		this.setBreakpoint(address);
 }
 
+BreakpointList.prototype.addEventListener = function(event, listener)
+{
+	if (!(event in this.eventListeners))
+		return false;
+	
+	this.eventListeners[event].push(listener);
+	return true;
+}
+
+BreakpointList.prototype.removeEventListener = function(event, listener)
+{
+	if (!(event in this.eventListeners))
+		return false;
+	
+	var index = this.eventListeners[event].indexOf(listener);
+	if (index == -1)
+		return false;
+	
+	this.eventListeners.splice(index, 1);
+	return true;
+}
+
+BreakpointList.prototype._eventCallback = function(fn)
+{
+	var eventParams = Array.prototype.slice.call(arguments, 1);
+	for (var i = 0; i < this.eventListeners[fn].length; i++)
+		this.eventListeners[fn][i].apply(this, eventParams);
+}
+
 var Breakpoint = function(address, skipHits)
 {
 	this.address = address;
 	this.skipHits = isFinite(skipHits) ? skipHits : 0;
 	this.hitCount = 0;
 	this.enabled = true;
+	
+	this.hitListeners = [];
 }
 
 Breakpoint.prototype.hit = function()
@@ -57,8 +98,33 @@ Breakpoint.prototype.hit = function()
 	if (!this.enabled) return;
 	
 	this.hitCount++;
+	for (var i = 0; i < this.hitListeners.length; i++)
+		this.hitListeners[i].call(this);
+	
 	if (this.hitCount > this.skipHits)
 		throw new Breakpoint.Hit(this);
+}
+
+Breakpoint.prototype.addEventListener = function(event, listener)
+{
+	if (event != "hit")
+		return false;
+	
+	this.hitListeners.push(listener);
+	return true;
+}
+
+Breakpoint.prototype.removeEventListener = function(event, listener)
+{
+	if (event != "hit")
+		return false;
+	
+	var index = this.hitListeners.indexOf(listener);
+	if (index == -1)
+		return false;
+	
+	this.hitListeners.splice(index, 1);
+	return true;
 }
 
 Breakpoint.prototype.toString = function()

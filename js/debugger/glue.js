@@ -3,15 +3,18 @@ var dbg = null;
 
 document.addEventListener("DOMContentLoaded", including.bind(null,
 	"js/core/disasm.js", "js/core/r3000a.js", "js/core/hwregs.js", "js/core/parallel.js",
-	"js/core/memory.js", "js/core/recompiler.js", "js/debugger/debugger.js",
-	"js/debugger/disasm-table.js", "js/debugger/breakpoint.js",
+	"js/core/memory.js", "js/core/recompiler.js", "js/core/asm.js",
+	"js/debugger/debugger.js", "js/debugger/disasm-table.js", "js/debugger/breakpoint.js",
+	"js/debugger/breakpoint-table.js",
 	function() {
 	const disassemblyLength = 25;
 	
-	var status = new StatusQueue(document.querySelector("#status"));
-	var disasm = new DisassemblyTable(document.querySelector("#disasm"));
 	psx = new R3000a();
 	dbg = new Debugger(psx);
+	
+	var status = new StatusQueue(document.querySelector("#status"));
+	var disasm = new DisassemblyTable(document.querySelector("#disasm"));
+	var breakpoints = new BreakpointTable(document.querySelector("#breakpoints"), dbg.breakpoints);
 	
 	var runButton = document.querySelector("#run");
 	var stepOverButton = document.querySelector("#step-over");
@@ -65,37 +68,10 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 		}
 	}
 	
-	function addBreakpoint(address)
-	{
-		var hexAddress = Recompiler.formatHex(address);
-		dbg.setBreakpoint(address);
-		var li = document.createElement('li');
-		li.setAttribute('data-address', address);
-		li.textContent = " " + hexAddress;
-		var del = document.createElement('span');
-		del.textContent = '[-]';
-		del.addEventListener("click", function() {
-			dbg.removeBreakpoint(address);
-			breakpoints.removeChild(li);
-		});
-		li.insertBefore(del, li.firstChild);
-		breakpoints.appendChild(li);
-	}
-	
 	function toggleBreakpoint()
 	{
-		var self = this;
 		var address = parseInt(this.textContent, 16);
-		if (dbg.breakpoints.indexOf(address) == -1)
-		{
-			addBreakpoint(address);
-		}
-		else
-		{
-			dbg.removeBreakpoint(address);
-			var li = breakpoints.querySelector("li[data-address=" + address + "]");
-			breakpoints.removeChild(li);
-		}
+		dbg.breakpoints.toggleBreakpoint(address);
 	}
 	
 	var diagnostics = {
@@ -126,7 +102,7 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 	dbg.diags = diagnostics;
 	psx.setDiagnosticsOutput(diagnostics);
 	
-	dbg.onstepped = function()
+	dbg.addEventListener("stepped", function()
 	{
 		for (var i = 0; i < regs.length; i++)
 			regs[i].update();
@@ -158,10 +134,10 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 			stack.firstChild.textContent = frameNumber + ": " + hexPC;
 		}
 		diagnostics.log("BIOS » " + hexPC);
-	}
+	});
 	
-	dbg.onsteppedinto = refreshStack;
-	dbg.onsteppedout = refreshStack;
+	dbg.addEventListener("steppedinto", refreshStack);
+	dbg.addEventListener("steppedout", refreshStack);
 	
 	document.querySelector("#bios-picker").addEventListener("change", function()
 	{
@@ -309,7 +285,7 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 		if (address == null) return;
 		
 		var intAddress = parseInt(address, 16);
-		addBreakpoint(intAddress);
+		dbg.breakpoints.setBreakpoint(intAddress);
 	});
 	
 	document.addEventListener("keydown", function(e)

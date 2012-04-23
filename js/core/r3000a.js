@@ -136,6 +136,8 @@ R3000a.prototype.writeCOP0 = function(reg, value)
 	var oldValue = this.cop0_reg[reg];
 	this.cop0_reg[reg] = value;
 	
+	this.diags.log("Writing " + value.toString(16) + " to " + Disassembler.cop0RegisterNames[reg]);
+	
 	switch (reg)
 	{
 		case 12: // SR
@@ -154,6 +156,8 @@ R3000a.prototype.writeCOP0 = function(reg, value)
 R3000a.prototype.clock = function(ticks)
 {
 	this.ticks += ticks;
+	if (this.ticks >= 2000000)
+		this.diags.log("2000000 ticks");
 }
 
 R3000a.prototype.execute = function(address, context)

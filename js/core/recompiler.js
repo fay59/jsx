@@ -84,8 +84,6 @@ Recompiler.prototype.recompileOpcode = function(currentAddress, op)
 {
 	var injectedBefore = this._injectBefore(currentAddress, op);
 	var injectedAfter = this._injectAfter(currentAddress, op);
-	if (injectedBefore === undefined) injectedBefore = '';
-	if (injectedAfter === undefined) injectedAfter = '';
 	
 	var addressString = Recompiler.formatHex(currentAddress);
 	var opcodeString = Disassembler.getOpcodeAsString(op);
@@ -218,7 +216,10 @@ Recompiler.prototype.compile = function()
 		
 		// should we create a new label?
 		if (this.compiledAddresses.indexOf(address) != -1)
+		{
 			jsCode += "case 0x" + Recompiler.formatHex(address) + ":\n";
+			jsCode += this._injectAtLabel(address);
+		}
 		
 		jsCode += this.code[address] + "\n";
 	}
@@ -270,15 +271,28 @@ Recompiler.prototype.recompileOne = function(memory, address)
 
 Recompiler.prototype._injectBefore = function(address, opcode)
 {
-	if (this.injector != null && this.injector.injectBefore !== undefined && this.injector.injectBefore.call !== undefined)
-		return this.injector.injectBefore.call(this.injector, address, opcode);
-	return '';
+	return this._injectCallback("injectBeforeInstruction", address, opcode);
 }
 
 Recompiler.prototype._injectAfter = function(address, opcode)
 {
-	if (this.injector != null && this.injector.injectAfter !== undefined && this.injector.injectAfter.call !== undefined)
-		return this.injector.injectAfter.call(this.injector, address, opcode);
+	return this._injectCallback("injectAfterInstruction", address, opcode);
+}
+
+Recompiler.prototype._injectAtLabel = function(address)
+{
+	return this._injectCallback("injectBeforeLabel", address);
+}
+
+Recompiler.prototype._injectCallback = function(fn)
+{
+	var args = Array.prototype.slice.call(arguments, 1);
+	if (this.injector != null && this.injector[fn] != null && this.injector[fn].call !== undefined)
+	{
+		var result = this.injector[fn].apply(this.injector, args);
+		if (result !== undefined)
+			return result;
+	}
 	return '';
 }
 

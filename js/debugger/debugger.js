@@ -10,9 +10,11 @@ var Debugger = function(cpu)
 	this.diag = console;
 	this.breakpoints = new BreakpointList(cpu);
 	
-	this.onstepped = null;
-	this.onsteppedinto = null;
-	this.onsteppedout = null;
+	this.eventListeners = {
+		stepped: [],
+		steppedinto: [],
+		steppedout: []
+	};
 	
 	var self = this;
 	
@@ -38,7 +40,13 @@ var Debugger = function(cpu)
 	
 	// interpose for recompilation
 	this.cpu.recompiler.injector = {
-		injectBefore: function(address, opcode)
+		injectBeforeLabel: function(address)
+		{
+			if (self.breakpoints.hasEnabledBreakpoint(address))
+				return "context.breakpoints.hit(" + address + ");\n";
+		},
+		
+		injectBeforeInstruction: function(address, opcode)
 		{
 			if (opcode.instruction.name == 'jal' || opcode.instruction.name == 'jalr')
 			{
@@ -50,7 +58,7 @@ var Debugger = function(cpu)
 			}
 		},
 		
-		injectAfter: function(address, opcode)
+		injectAfterInstruction: function(address, opcode)
 		{
 			var nextAddress = address + 4;
 			// in case of a jump, account for the delay slot too
@@ -59,11 +67,34 @@ var Debugger = function(cpu)
 			
 			if (self.breakpoints.hasEnabledBreakpoint(nextAddress))
 				return "context.breakpoints.hit(" + nextAddress + ");\n";
-			
-			if ((address & 0x1FFFFFFF) == (0xbfc00da0 & 0x1fffffff))
-				return "console.debug('hit 0xbfc00da0');\n";
 		}
 	};
+}
+
+Debugger.STEPPED_EVENT = "stepped";
+Debugger.STEPPED_INTO_EVENT = "stepped";
+Debugger.STEPPED_OUT_EVENT = "stepped";
+
+Debugger.prototype.addEventListener = function(event, listener)
+{
+	if (!(event in this.eventListeners))
+		return false;
+	
+	this.eventListeners[event].push(listener);
+	return true;
+}
+
+Debugger.prototype.removeEventListener = function(event, listener)
+{
+	if (!(event in this.eventListeners))
+		return false;
+	
+	var index = this.eventListeners[event].indexOf(listener);
+	if (index == -1)
+		return false;
+	
+	this.eventListeners.splice(index, 1);
+	return true;
 }
 
 Debugger.prototype.reset = function(pc, memory)
@@ -73,8 +104,8 @@ Debugger.prototype.reset = function(pc, memory)
 	this.cpu.hardwareReset();
 	this.cpu.softwareReset(memory);
 	
-	this._stepCallback(this.onstepped);
-	this._stepCallback(this.onsteppedinto);
+	this._eventCallback("stepped");
+	this._eventCallback("steppedinto");
 }
 
 Debugger.prototype.getGPR = function(index)
@@ -97,23 +128,6 @@ Debugger.prototype.setCPR = function(index, value)
 	this.cpu.gpr[index] = this._parseValue(value);
 }
 
-Debugger.prototype.setBreakpoint = function(breakpoint)
-{
-	if (!isFinite(breakpoint))
-		throw new Error("breakpoint needs to be defined and numeric");
-	
-	breakpoint = Recompiler.unsign(breakpoint);
-	this.breakpoints.setBreakpoint(breakpoint)
-}
-
-Debugger.prototype.removeBreakpoint = function(breakpoint)
-{
-	if (!isFinite(breakpoint))
-		throw new Error("breakpoint needs to be defined and numeric");
-	
-	this.breakpoints.removeBreakpoint(breakpoint);
-}
-
 Debugger.prototype.stepOver = function()
 {
 	// jr must be manually implemented
@@ -127,7 +141,7 @@ Debugger.prototype.stepOver = function()
 		if (opcode.params[0] == 31)
 		{
 			this.stack.pop();
-			this._stepCallback(this.onsteppedout);
+			this._eventCallback("steppedout");
 		}
 	}
 	else
@@ -145,7 +159,7 @@ Debugger.prototype.stepOver = function()
 			this._handleException(ex);
 		}
 	}
-	this._stepCallback(this.onstepped);
+	this._eventCallback("stepped");
 }
 
 Debugger.prototype.canStepInto = function()
@@ -179,16 +193,16 @@ Debugger.prototype.stepInto = function()
 		this.cpu.gpr[opcode.params[1]] = this.pc + 8;
 		this.pc = this.cpu.gpr[opcode.params[0]];
 	}
-	this._stepCallback(this.onsteppedinto);
-	this._stepCallback(this.onstepped);
+	this._eventCallback("steppedinto");
+	this._eventCallback("stepped");
 }
 
 Debugger.prototype.stepOut = function()
 {
 	this.cpu.execute(this.pc, this);
 	this.pc = this.stack.pop();
-	this._stepCallback(this.onsteppedout);
-	this._stepCallback(this.onstepped);
+	this._eventCallback("steppedout");
+	this._eventCallback("stepped");
 }
 
 Debugger.prototype.runUntil = function(desiredPC)
@@ -225,13 +239,13 @@ Debugger.prototype.run = function()
 Debugger.prototype._enterFunction = function(returnAddress)
 {
 	this.stack.push(returnAddress);
-	this._stepCallback(this.onsteppedinto);
+	this._eventCallback("steppedinto");
 }
 
 Debugger.prototype._leaveFunction = function()
 {
 	this.stack.pop();
-	this._stepCallback(this.onsteppedout);
+	this._eventCallback("steppedout");
 }
 
 Debugger.prototype._handleException = function(ex)
@@ -240,13 +254,13 @@ Debugger.prototype._handleException = function(ex)
 	{
 		this.pc = ex.breakpoint.address;
 		this.diags.log("stopped at " + this.pc);
-		this._stepCallback(this.onstepped);
+		this._eventCallback("stepped");
 	}
 	else if (ex.constructor == ExecutionException)
 	{
 		this.diags.error(ex.cause ? ex.cause.message : ex.message);
 		this.pc = ex.pc;
-		this._stepCallback(this.onstepped);
+		this._eventCallback("stepped");
 	}
 	else
 	{
@@ -254,10 +268,11 @@ Debugger.prototype._handleException = function(ex)
 	}
 }
 
-Debugger.prototype._stepCallback = function(fn)
+Debugger.prototype._eventCallback = function(fn)
 {
-	if (fn != null && fn.call)
-		fn.call(this);
+	var eventParams = Array.prototype.slice.call(arguments, 1);
+	for (var i = 0; i < this.eventListeners[fn].length; i++)
+		this.eventListeners[fn][i].apply(this, eventParams);
 }
 
 Debugger.prototype._parseValue = function(value)
