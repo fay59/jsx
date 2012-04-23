@@ -1,5 +1,6 @@
 var psx = null;
 var dbg = null;
+var memory = null;
 
 document.addEventListener("DOMContentLoaded", including.bind(null,
 	"js/core/disasm.js", "js/core/r3000a.js", "js/core/hwregs.js", "js/core/parallel.js",
@@ -12,10 +13,20 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 	psx = new R3000a();
 	dbg = new Debugger(psx);
 	
+	function reset()
+	{
+		psx.stop();
+		dbg.reset(R3000a.bootAddress, memory);
+		
+		var message = "Loaded BIOS » 0x" + Recompiler.formatHex(dbg.pc);
+		status.display(message, 'black');
+	}
+	
 	var status = new StatusQueue(document.querySelector("#status"));
 	var disasm = new DisassemblyTable(document.querySelector("#disasm"));
 	var breakpoints = new BreakpointTable(document.querySelector("#breakpoints"), dbg.breakpoints);
 	
+	var resetButton = document.querySelector("#reset");
 	var runButton = document.querySelector("#run");
 	var stepOverButton = document.querySelector("#step-over");
 	var stepIntoButton = document.querySelector("#step-into");
@@ -147,13 +158,9 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 			var bios = new GeneralPurposeBuffer(reader.result);
 			var hardwareRegisters = new HardwareRegisters();
 			var parallelPort = new ParallelPortMemoryRange();
-			var memory = new MemoryMap(hardwareRegisters, parallelPort, bios);
+			memory = new MemoryMap(hardwareRegisters, parallelPort, bios);
 			
-			psx.stop();
-			dbg.reset(R3000a.bootAddress, memory);
-			
-			var message = "Loaded BIOS » 0x" + Recompiler.formatHex(dbg.pc);
-			status.display(message, 'black');
+			reset();
 		}
 		reader.readAsArrayBuffer(this.files[0]);
 	});
@@ -272,6 +279,7 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 		}
 	}
 	
+	resetButton.addEventListener("click", reset);
 	runButton.addEventListener("click", run);
 	stepOverButton.addEventListener("click", stepOver);
 	stepIntoButton.addEventListener("click", stepInto);

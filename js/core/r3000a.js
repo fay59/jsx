@@ -104,9 +104,11 @@ R3000a.prototype.stop = function()
 	this.stopped = true;
 }
 
-// this simulates the PSX hardware as if it just powered on
-R3000a.prototype.hardwareReset = function()
+R3000a.prototype.reset = function(memory)
 {
+	this.memory = memory;
+	this.memory.diags = this.diags;
+	
 	for (var i = 0; i < 32; i++)
 	{
 		this.gpr[i] = 0;
@@ -121,14 +123,8 @@ R3000a.prototype.hardwareReset = function()
 	// values taken from pSX's debugger at reset
 	this.cop0_reg[12] = 0x00400002;
 	this.cop0_reg[15] = 0x00000230;
-}
-
-// this should be merged with hardwareReset, really
-R3000a.prototype.softwareReset = function(memory, cdrom)
-{
-	this.memory = memory;
-	this.memory.diags = this.diags;
-	// fill me up
+	
+	this.compiled = {};
 }
 
 R3000a.prototype.writeCOP0 = function(reg, value)

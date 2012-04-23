@@ -19,6 +19,12 @@ BreakpointList.prototype.hasEnabledBreakpoint = function(address)
 	return address in this.list;
 }
 
+BreakpointList.prototype.resetHits = function()
+{
+	for (var key in this.list)
+		this.list[key].setHits(0);
+}
+
 BreakpointList.prototype.getBreakpoint = function(address)
 {
 	return this.list[address];
@@ -104,10 +110,7 @@ Breakpoint.prototype.hit = function()
 		return;
 	}
 	
-	this.hitCount++;
-	for (var i = 0; i < this.hitListeners.length; i++)
-		this.hitListeners[i].call(this);
-	
+	this.setHits(this.hitCount + 1);
 	if (this.hitCount > this.skipHits)
 		throw new Breakpoint.Hit(this);
 }
@@ -132,6 +135,13 @@ Breakpoint.prototype.removeEventListener = function(event, listener)
 	
 	this.hitListeners.splice(index, 1);
 	return true;
+}
+
+Breakpoint.prototype.setHits = function(hits)
+{
+	this.hitCount = hits;
+	for (var i = 0; i < this.hitListeners.length; i++)
+		this.hitListeners[i].call(this);
 }
 
 Breakpoint.prototype.toString = function()

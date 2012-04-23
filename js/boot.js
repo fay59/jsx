@@ -11,8 +11,7 @@ document.addEventListener('DOMContentLoaded', function()
 			var memory = new MemoryMap(hardwareRegisters, parallelPort, bios);
 			
 			var psx = new R3000a();
-			psx.hardwareReset();
-			psx.softwareReset(memory);
+			psx.reset(memory);
 			
 			try
 			{

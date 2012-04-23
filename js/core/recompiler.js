@@ -513,7 +513,7 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("bgez", function(s, i) {
-		return branch.call(this, gpr(s) + " >= 0", i);
+		return branch.call(this, sign(gpr(s)) + " >= 0", i);
 	});
 	
 	impl("bgezal", function() {
@@ -522,15 +522,15 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("bgtz", function(s, i) {
-		return branch.call(this, gpr(s) + " > 0", i);
+		return branch.call(this, sign(gpr(s)) + " > 0", i);
 	});
 	
 	impl("blez", function(s, i) {
-		return branch.call(this, gpr(s) + " <= 0", i);
+		return branch.call(this, sign(gpr(s)) + " <= 0", i);
 	});
 	
 	impl("bltz", function(s, i) {
-		return branch.call(this, gpr(s) + " < 0", i);
+		return branch.call(this, sign(gpr(s)) + " < 0", i);
 	});
 	
 	impl("bltzal", function() {
@@ -582,8 +582,8 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("div", function(s, t) {
-		var jsCode = "this.gpr[32] = (" + gpr(s) + " | 0) % (" + gpr(t) + " | 0);\n";
-		jsCode += "this.gpr[33] = (" + gpr(s) + " | 0) / (" + gpr(t) + " | 0);\n";
+		var jsCode = "this.gpr[32] = " + sign(gpr(s)) + " % " + sign(gpr(t)) + ";\n";
+		jsCode += "this.gpr[33] = " + sign(gpr(s)) + " / " + sign(gpr(t)) + ";\n";
 		return jsCode;
 	});
 	
@@ -824,7 +824,7 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("slt", function(s, t, d) {
-		return gpr(d) + " = (" + gpr(s) + " | 0) < (" + gpr(t) + " | 0);\n";
+		return gpr(d) + " = " + sign(gpr(s)) + " < " + sign(gpr(t)) + ";\n";
 	});
 	
 	impl("slti", function(s, t, i) {

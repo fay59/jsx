@@ -97,8 +97,8 @@ Debugger.prototype.reset = function(pc, memory)
 {
 	this.pc = pc;
 	this.stack = [this.pc];
-	this.cpu.hardwareReset();
-	this.cpu.softwareReset(memory);
+	this.cpu.reset(memory);
+	this.breakpoints.resetHits();
 	
 	this._eventCallback("stepped");
 	this._eventCallback("steppedinto");
@@ -145,9 +145,6 @@ Debugger.prototype.stepOver = function()
 		try
 		{
 			var newPC = this.cpu.executeOne(this.pc, this);
-			// correct for branches
-			if (newPC == this.pc + 4 && opcode.instruction.name[0] == 'b')
-				newPC += 4;
 			this.pc = newPC;
 		}
 		catch (ex)
@@ -207,7 +204,7 @@ Debugger.prototype.runUntil = function(desiredPC)
 		throw new Error("desiredPC needs to be defined and finite");
 	
 	desiredPC = Recompiler.unsign(desiredPC);
-	this.breakpoints.addBreakpoint(desiredPC);
+	this.breakpoints.setBreakpoint(desiredPC);
 	try
 	{
 		this.run();
