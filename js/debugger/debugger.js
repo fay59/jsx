@@ -1,14 +1,22 @@
 var Debugger = function(cpu)
 {
-	var pc = R3000a.bootAddress;
-	// ensure that this.pc is always positive
-	this.__defineGetter__("pc", function() { return pc; });
-	this.__defineSetter__("pc", function(x) { pc = Recompiler.unsign(x); });
-	
 	this.stack = [];
 	this.cpu = cpu;
 	this.diag = console;
 	this.breakpoints = new BreakpointList(cpu);
+	this._lastHitBreakpoint = null;
+	
+	var pc = R3000a.bootAddress;
+	// ensure that this.pc is always positive
+	this.__defineGetter__("pc", function() { return pc; });
+	this.__defineSetter__("pc", function(x) {
+		if (this._lastHitBreakpoint != null)
+		{
+			this._lastHitBreakpoint._skipOnce = false;
+			this._lastHitBreakpoint = null;
+		}
+		pc = Recompiler.unsign(x);
+	});
 	
 	this.eventListeners = {
 		stepped: [],
@@ -40,33 +48,21 @@ var Debugger = function(cpu)
 	
 	// interpose for recompilation
 	this.cpu.recompiler.injector = {
-		injectBeforeLabel: function(address)
-		{
-			if (self.breakpoints.hasEnabledBreakpoint(address))
-				return "context.breakpoints.hit(" + address + ");\n";
-		},
-		
 		injectBeforeInstruction: function(address, opcode)
 		{
+			var jsCode = "";
+			if (self.breakpoints.hasEnabledBreakpoint(address))
+				jsCode += "context.breakpoints.hit(" + address + ");\n";
+			
 			if (opcode.instruction.name == 'jal' || opcode.instruction.name == 'jalr')
 			{
-				return "context._enterFunction(0x" + address.toString(16) + ");\n";
+				jsCode += "context._enterFunction(0x" + address.toString(16) + ");\n";
 			}
 			else if (opcode.instruction.name == 'jr' && opcode.params[0] == 31)
 			{
-				return "context._leaveFunction();\n";
+				jsCode += "context._leaveFunction();\n";
 			}
-		},
-		
-		injectAfterInstruction: function(address, opcode)
-		{
-			var nextAddress = address + 4;
-			// in case of a jump, account for the delay slot too
-			if (opcode.instruction.name[0] == "j")
-				nextAddress += 4;
-			
-			if (self.breakpoints.hasEnabledBreakpoint(nextAddress))
-				return "context.breakpoints.hit(" + nextAddress + ");\n";
+			return jsCode;
 		}
 	};
 }
@@ -214,13 +210,11 @@ Debugger.prototype.runUntil = function(desiredPC)
 	this.breakpoints.addBreakpoint(desiredPC);
 	try
 	{
-		this.cpu.execute(this.pc, this);
+		this.run();
 	}
-	catch (ex)
+	finally
 	{
-		this._handleException(ex);
-		if (ex.constructor == Breakpoint.Hit && ex.address == desiredPC)
-			this.breakpoints.removeBreakpoint(desiredPC)
+		this.breakpoints.removeBreakpoint(desiredPC);
 	}
 }
 
@@ -228,7 +222,11 @@ Debugger.prototype.run = function()
 {
 	try
 	{
-		this.cpu.execute(this.pc, this);
+		while (true)
+		{
+			this.cpu.execute(this.pc, this);
+			this.pc = this.cpu.gpr[31];
+		}
 	}
 	catch (ex)
 	{
@@ -253,6 +251,9 @@ Debugger.prototype._handleException = function(ex)
 	if (ex.constructor == Breakpoint.Hit)
 	{
 		this.pc = ex.breakpoint.address;
+		this._lastHitBreakpoint = ex.breakpoint;
+		this._lastHitBreakpoint._skipOnce = true;
+		
 		this.diags.log("stopped at " + this.pc);
 		this._eventCallback("stepped");
 	}

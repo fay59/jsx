@@ -89,6 +89,7 @@ var Breakpoint = function(address, skipHits)
 	this.skipHits = isFinite(skipHits) ? skipHits : 0;
 	this.hitCount = 0;
 	this.enabled = true;
+	this._skipOnce = false;
 	
 	this.hitListeners = [];
 }
@@ -96,6 +97,12 @@ var Breakpoint = function(address, skipHits)
 Breakpoint.prototype.hit = function()
 {
 	if (!this.enabled) return;
+	
+	if (this._skipOnce)
+	{
+		this._skipOnce = false;
+		return;
+	}
 	
 	this.hitCount++;
 	for (var i = 0; i < this.hitListeners.length; i++)
