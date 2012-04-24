@@ -786,7 +786,7 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("ori", function(s, t, i) {
-		return binaryOp("|", t, s, signExt(i, 16));
+		return binaryOp("|", t, s, hex(i));
 	});
 	
 	impl("rfe", function() {
@@ -812,7 +812,7 @@ Recompiler.formatHex = function(address, length)
 		return store(16, s, i, t);
 	});
 	
-	impl("sll", function(t, d, i) {
+	impl("sll", function(t, d, i) { // why does it have an 's' register?
 		return binaryOp("<<", d, t, hex(i));
 	});
 	
