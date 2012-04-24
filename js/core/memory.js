@@ -76,17 +76,27 @@ MemoryMap.unmapped = {
 	u16Array: new Uint16Array(this.buffer),
 	u32Array: new Uint32Array(this.buffer),
 	
+	warningMessage: function(getter)
+	{
+		// dark magic!
+		var address = getter.caller.arguments[0];
+		if (isFinite(address))
+			console.warn("accessing unmapped memory at address " + address.toString(16));
+		else
+			console.warn("accessing unmapped memory--set a breakpoint in memory.js to debug");
+	},
+	
 	get offset() { return 0; },
 	get u8() {
-		console.warn("accessing unmapped memory--set a breakpoint in memory.js to debug");
+		this.warningMessage(this.__lookupGetter__("u8"));
 		return this.u8Array;
 	},
 	get u16() {
-		console.warn("accessing unmapped memory--set a breakpoint in memory.js to debug");
+		this.warningMessage(this.__lookupGetter__("u16"));
 		return this.u16Array;
 	},
 	get u32() {
-		console.warn("accessing unmapped memory--set a breakpoint in memory.js to debug");
+		this.warningMessage(this.__lookupGetter__("u32"));
 		return this.u32Array;
 	}
 };

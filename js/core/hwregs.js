@@ -14,7 +14,8 @@ var HardwareRegisters = function()
 	{
 		return function()
 		{
-			console.warn("reading register " + index.toString(16));
+			var address = (0x1F801000 + index).toString(16);
+			console.warn("reading register " + address);
 			return buffer[index];
 		};
 	}
