@@ -10,23 +10,23 @@ var HardwareRegisters = function()
 	this.u16 = {};
 	this.u32 = {};
 	
-	function getter(buffer, index)
+	function getter(buffer, index, shift)
 	{
 		return function()
 		{
 			var address = (0x1F801000 + index).toString(16);
 			console.warn("reading register " + address);
-			return buffer[index];
+			return buffer[index >>> shift];
 		};
 	}
 	
-	function setter(buffer, index)
+	function setter(buffer, index, shift)
 	{
 		return function(value)
 		{
 			var address = (0x1F801000 + index).toString(16);
 			console.warn("writing register " + address + " -> " + value.toString(16));
-			buffer[index] = value;
+			buffer[index >>> shift] = value;
 		};
 	}
 	
@@ -34,17 +34,17 @@ var HardwareRegisters = function()
 	{
 		if (i % 4 == 0)
 		{
-			this.u32.__defineGetter__(i, getter(u32, i >>> 2));
-			this.u32.__defineSetter__(i, setter(u32, i >>> 2));
+			this.u32.__defineGetter__(i, getter(u32, i, 2));
+			this.u32.__defineSetter__(i, setter(u32, i, 2));
 		}
 		
 		if (i % 2 == 0)
 		{
-			this.u16.__defineGetter__(i, getter(u32, i >>> 1));
-			this.u16.__defineSetter__(i, setter(u32, i >>> 1));
+			this.u16.__defineGetter__(i, getter(u16, i, 1));
+			this.u16.__defineSetter__(i, setter(u16, i, 1));
 		}
 				
-		this.u32.__defineGetter__(i, getter(u8, i));
-		this.u32.__defineSetter__(i, setter(u8, i));
+		this.u8.__defineGetter__(i, getter(u8, i, 0));
+		this.u8.__defineSetter__(i, setter(u8, i, 0));
 	}
 }
