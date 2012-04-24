@@ -178,7 +178,7 @@ Recompiler.prototype.panic = function(instruction, address)
 	}
 }
 
-Recompiler.functionPrelude = "var condition = false;\nvar writeAddress = 0;\nvar overflowChecked = 0;\n";
+Recompiler.functionPrelude = "var overflowChecked = 0;\n";
 
 Recompiler.prototype.compile = function()
 {
@@ -457,9 +457,7 @@ Recompiler.formatHex = function(address, length)
 		var targetAddress = Recompiler.unsign(opAddress + (signExt(offset, 16) << 2));
 		this.addLabel(targetAddress, opAddress);
 		
-		var jsCode = "condition = " + condition + ";\n";
-		
-		jsCode += "if (condition) {\n";
+		var jsCode = "if (" + condition + ") {\n";
 		jsCode += delaySlot.call(this);
 		jsCode += "pc = " + hex(targetAddress) + ";\n";
 		jsCode += "break;\n";
@@ -788,7 +786,7 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("ori", function(s, t, i) {
-		return binaryOp("|", t, s, hex(i));
+		return binaryOp("|", t, s, signExt(i, 16));
 	});
 	
 	impl("rfe", function() {
@@ -814,7 +812,7 @@ Recompiler.formatHex = function(address, length)
 		return store(16, s, i, t);
 	});
 	
-	impl("sll", function(t, d, i) { // why does it have an 's' register?
+	impl("sll", function(t, d, i) {
 		return binaryOp("<<", d, t, hex(i));
 	});
 	
