@@ -1,21 +1,23 @@
 var Debugger = function(cpu)
 {
+	var self = this;
+	
 	this.stack = [];
 	this.cpu = cpu;
 	this.diag = console;
 	this.breakpoints = new BreakpointList(cpu);
 	this._lastHitBreakpoint = null;
 	
-	var pc = R3000a.bootAddress;
+	this._pc = R3000a.bootAddress;
 	// ensure that this.pc is always positive
-	this.__defineGetter__("pc", function() { return pc; });
+	this.__defineGetter__("pc", function() { return this._pc; });
 	this.__defineSetter__("pc", function(x) {
 		if (this._lastHitBreakpoint != null)
 		{
 			this._lastHitBreakpoint._skipOnce = false;
 			this._lastHitBreakpoint = null;
 		}
-		pc = Recompiler.unsign(x);
+		this._pc = Recompiler.unsign(x);
 	});
 	
 	this.eventListeners = {
@@ -24,11 +26,11 @@ var Debugger = function(cpu)
 		steppedout: []
 	};
 	
-	var self = this;
-	
-	// intercept CPU registers
+	// intercept CPU register reads and writes
 	var regs = this.cpu.gpr;
 	this.cpu.gpr = {};
+	this.lastRegWrites = [];
+	
 	function gprGetter(i) { return function() { return regs[i]; }; }
 	function gprSetter(i)
 	{
@@ -36,6 +38,7 @@ var Debugger = function(cpu)
 		{
 			if (!isFinite(value))
 				throw new Error("trying to assign a non-finite value to " + Disassembler.registerNames[i]);
+			self.lastRegWrites[i] = self._pc;
 			regs[i] = value;
 		}
 	};
@@ -44,13 +47,14 @@ var Debugger = function(cpu)
 	{
 		this.cpu.gpr.__defineGetter__(i, gprGetter(i));
 		this.cpu.gpr.__defineSetter__(i, gprSetter(i));
+		this.lastRegWrites.push(0);
 	}
 	
 	// interpose for recompilation
 	this.cpu.recompiler.injector = {
 		injectBeforeInstruction: function(address, opcode)
 		{
-			var jsCode = "";
+			var jsCode = "context._pc = " + address + ";\n";
 			if (self.breakpoints.hasEnabledBreakpoint(address))
 				jsCode += "context.breakpoints.hit(" + address + ");\n";
 			
@@ -99,6 +103,8 @@ Debugger.prototype.reset = function(pc, memory)
 	this.stack = [this.pc];
 	this.cpu.reset(memory);
 	this.breakpoints.resetHits();
+	for (var i = 0; i < this.lastRegWrites.length; i++)
+		this.lastRegWrites[i] = 0;
 	
 	this._eventCallback("stepped");
 	this._eventCallback("steppedinto");

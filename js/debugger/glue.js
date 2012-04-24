@@ -198,6 +198,11 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 		return label;
 	}
 	
+	function makeTitle(i)
+	{
+		return function() { this.title = Recompiler.formatHex(dbg.lastRegWrites[i]); }
+	}
+	
 	var regContainers = document.querySelectorAll(".regs");
 	var regs = [];
 	for (var i = 0; i < 16; i++)
@@ -207,6 +212,7 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 		regContainers[0].appendChild(gpr);
 		regContainers[1].appendChild(cpr);
 		regs.push(gpr, cpr);
+		gpr.addEventListener("mouseover", makeTitle(i));
 	}
 	
 	for (var i = 16; i < 32; i++)
@@ -214,6 +220,7 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 		var gpr = regField("GPR", 4, i, Disassembler.registerNames);
 		regContainers[0].appendChild(gpr);
 		regs.push(gpr);
+		gpr.addEventListener("mouseover", makeTitle(i));
 	}
 	
 	function showDivByIndex(index)

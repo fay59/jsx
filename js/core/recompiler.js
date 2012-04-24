@@ -830,7 +830,6 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("sltiu", function(s, t, i) {
-		countUnimplemented.call(this, "sltiu");
 		return gpr(t) + " = " + gpr(s) + " < " + i + ";\n";
 	});
 	
@@ -866,7 +865,7 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("subu", function(s, t, d) {
-		return binaryOp("-", d, s, t);
+		return binaryOp("-", d, s, gpr(t));
 	});
 	
 	impl("sw", function(s, t, i) {
