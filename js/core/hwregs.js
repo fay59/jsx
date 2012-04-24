@@ -1,5 +1,64 @@
-var HardwareRegisters = function()
+var DMARegisters = function()
 {
+	this.madr = 0; // memory address
+	this.bcr = 0; // block size & block count
+	this.chcr = 0; // command to take
+}
+
+DMARegisters.prototype.wire = function(hwregs, address, action)
+{
+	var self = this;
+	hwregs.wire(address,
+		function() { return self.madr; },
+		function(value) { self.madr = value; }
+	);
+	
+	hwregs.wire(address + 4,
+		function() { return self.bcr; },
+		function(value) { self.bcr = value; }
+	);
+	
+	hwregs.wire(address + 8,
+		function() { return self.chcr; },
+		function(value) {
+			self.chcr = value;
+			action.call(this);
+		}
+	);
+}
+
+var HardwareRegisters = function(mdec)
+{
+	function getter(buffer, index)
+	{
+		return function() { return buffer[index]; }
+	}
+	
+	function setter(buffer, index)
+	{
+		return function(value) { buffer[index] = value; }
+	}
+	
+	function undef_getter(buffer, index, shift)
+	{
+		return function()
+		{
+			var address = (0x1F801000 + index).toString(16);
+			console.warn("reading register " + address);
+			return buffer[index >>> shift];
+		};
+	}
+	
+	function undef_setter(buffer, index, shift)
+	{
+		return function(value)
+		{
+			var address = (0x1F801000 + index).toString(16);
+			console.warn("writing register " + address + " -> " + value.toString(16));
+			buffer[index >>> shift] = value;
+		};
+	}
+	
 	this.backbuffer = new ArrayBuffer(0x2000);
 	
 	var u8 = new Uint8Array(this.backbuffer);
@@ -10,41 +69,33 @@ var HardwareRegisters = function()
 	this.u16 = {};
 	this.u32 = {};
 	
-	function getter(buffer, index, shift)
-	{
-		return function()
-		{
-			var address = (0x1F801000 + index).toString(16);
-			console.warn("reading register " + address);
-			return buffer[index >>> shift];
-		};
-	}
+	mdec.install(this);
 	
-	function setter(buffer, index, shift)
+	for (var i = 0xf0; i < 0x2000; i++)
 	{
-		return function(value)
+		if (i % 4 == 0 && !(i in this.u32))
 		{
-			var address = (0x1F801000 + index).toString(16);
-			console.warn("writing register " + address + " -> " + value.toString(16));
-			buffer[index >>> shift] = value;
-		};
-	}
-	
-	for (var i = 0; i < 0x2000; i++)
-	{
-		if (i % 4 == 0)
-		{
-			this.u32.__defineGetter__(i, getter(u32, i, 2));
-			this.u32.__defineSetter__(i, setter(u32, i, 2));
+			this.u32.__defineGetter__(i, undef_getter(u32, i, 2));
+			this.u32.__defineSetter__(i, undef_setter(u32, i, 2));
 		}
 		
-		if (i % 2 == 0)
+		if (i % 2 == 0 && !(i in this.u16))
 		{
-			this.u16.__defineGetter__(i, getter(u16, i, 1));
-			this.u16.__defineSetter__(i, setter(u16, i, 1));
+			this.u16.__defineGetter__(i, undef_getter(u16, i, 1));
+			this.u16.__defineSetter__(i, undef_setter(u16, i, 1));
 		}
-				
-		this.u8.__defineGetter__(i, getter(u8, i, 0));
-		this.u8.__defineSetter__(i, setter(u8, i, 0));
+		
+		if (!(i in this.u8))
+		{
+			this.u8.__defineGetter__(i, undef_getter(u8, i, 0));
+			this.u8.__defineSetter__(i, undef_setter(u8, i, 0));
+		}
 	}
+}
+
+HardwareRegisters.prototype.wire = function(address, getter, setter)
+{
+	address -= 0x1F801000;
+	this.u32.__defineGetter__(address >> 2, getter);
+	this.u32.__defineSetter__(address >> 2, setter);
 }
