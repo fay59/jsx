@@ -390,7 +390,7 @@ Disassembler.patternData = {
 	},
 	'sllv': {	// shift word left logical variable
 		pattern: '0000 00ss ssst tttt dddd d000 0000 0100',
-		format: 'sllv {d}, {s}, {t}'
+		format: 'sllv {d}, {t}, {s}'
 	},
 	'slt': {	// set on less than
 		pattern: '0000 00ss ssst tttt dddd d000 0010 1010',
@@ -418,7 +418,7 @@ Disassembler.patternData = {
 	},
 	'srav': {	// shift word right arithmetic variable
 		pattern: '0000 00ss ssst tttt dddd d000 0000 0111',
-		format: 'srav {d}, {s}, {t}'
+		format: 'srav {d}, {t}, {s}'
 	},
 	'srl': {	// shift word right logical
 		pattern: '0000 0000 000t tttt dddd diii ii00 0010',
@@ -426,7 +426,7 @@ Disassembler.patternData = {
 	},
 	'srlv': {	// shift word right logical variable
 		pattern: '0000 00ss ssst tttt dddd d000 0000 0110',
-		format: 'srlv {d}, {s}, {t}'
+		format: 'srlv {d}, {t}, {s}'
 	},
 	'sub': {	// subtract word
 		pattern: '0000 00ss ssst tttt dddd d000 0010 0010',

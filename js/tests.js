@@ -90,15 +90,19 @@ var bios = new GeneralPurposeBuffer(0x80000);
 var hardwareRegisters = new HardwareRegisters();
 var parallelPort = new ParallelPortMemoryRange();
 
+function initialValue(register)
+{
+	return (register * 17) + (register * 1339);
+}
+
 function testCPU()
 {
 	var cpu = new R3000a();
 	var memory = new MemoryMap(hardwareRegisters, parallelPort, bios);
-	cpu.hardwareReset();
-	cpu.softwareReset(memory);
+	cpu.reset(memory);
 	
 	for (var i = 0; i < cpu.gpr.length; i++)
-		cpu.gpr[i] = i;
+		cpu.gpr[i] = initialValue(i);
 	
 	for (var i = 0; i < cpu.cop0_reg.length; i++)
 		cpu.cop0_reg[i] = 32 + i;
@@ -273,7 +277,7 @@ var Tests = {
 		{
 			var cpu = perform(["and v0, t7, t8"]);
 			with (Assembler.registerNames)
-				r.assert(cpu.gpr[v0] == (t7 & t8), "execution didn't have the expected result");
+				r.assert(cpu.gpr[v0] == (initialValue(t7) & initialValue(t8)), "execution didn't have the expected result");
 			r.complete();
 		},
 		
@@ -282,7 +286,7 @@ var Tests = {
 			{
 				var cpu = perform(["andi v0, t8, 148c"]);
 				with (Assembler.registerNames)
-					r.assert(cpu.gpr[v0] == (t8 & 0x148c), "execution didn't have the expected result");
+					r.assert(cpu.gpr[v0] == (initialValue(t8) & 0x148c), "execution didn't have the expected result");
 				r.complete();
 			},
 			
@@ -290,7 +294,7 @@ var Tests = {
 			{
 				var cpu = perform(["andi v0, t8, -148c"]);
 				with (Assembler.registerNames)
-					r.assert(cpu.gpr[v0] == (t8 & -0x148c), "execution didn't have the expected result");
+					r.assert(cpu.gpr[v0] == (initialValue(t8) & -0x148c), "execution didn't have the expected result");
 				r.complete();
 			}
 		},
@@ -426,7 +430,7 @@ var Tests = {
 		{
 			var cpu = perform(["sra at, t7, 4"]);
 			with (Assembler.registerNames)
-				r.assert(cpu.gpr[at] == (t7 >> 4), "execution didn't have the expected result");
+				r.assert(cpu.gpr[at] == (initialValue(t7) >> 4), "execution didn't have the expected result");
 			r.complete();
 		},
 		
@@ -434,15 +438,19 @@ var Tests = {
 		{
 			var cpu = perform(["srl at, t7, 4"]);
 			with (Assembler.registerNames)
-				r.assert(cpu.gpr[at] == (t7 >>> 4), "execution didn't have the expected result");
+				r.assert(cpu.gpr[at] == (initialValue(t7) >>> 4), "execution didn't have the expected result");
 			r.complete();
 		},
 		
 		"srav": function(r)
 		{
-			var cpu = perform(["srav at, t7, t0"]);
+			const shift = 3;
+			var cpu = perform([
+				"addiu t0, r0, " + shift,
+				"srav at, t7, t0"
+			]);
 			with (Assembler.registerNames)
-				r.assert(cpu.gpr[at] == (t7 >> t0), "execution didn't have the expected result");
+				r.assert(cpu.gpr[at] == (initialValue(t7) >> shift), "execution didn't have the expected result");
 			r.complete();
 		},
 		
@@ -451,7 +459,7 @@ var Tests = {
 			{
 				var cpu = perform(["subu at, t7, t0"]);
 				with (Assembler.registerNames)
-					r.assert(cpu.gpr[at] == (t7 - t0), "execution didn't have the expected result");
+					r.assert(cpu.gpr[at] == (initialValue(t7) - initialValue(t0)), "execution didn't have the expected result");
 				r.complete();
 			},
 			
@@ -459,7 +467,7 @@ var Tests = {
 			{
 				var cpu = perform(["subu at, t0, t7"]);
 				with (Assembler.registerNames)
-					r.assert((cpu.gpr[at] | 0) == (t0 - t7), "execution didn't have the expected result");
+					r.assert((cpu.gpr[at] | 0) == (initialValue(t0) - initialValue(t7)), "execution didn't have the expected result");
 				r.complete();
 			}
 		},
@@ -503,8 +511,8 @@ var Tests = {
 		{
 			with (Assembler.registerNames)
 			{
-				var cpu = perform(["sltiu at, v0, " + v1]);
-				r.assert(cpu.gpr[at] == (cpu.gpr[v0] < v1), "execution didn't have the expected result");
+				var cpu = perform(["sltiu at, v0, " + initialValue(v1)]);
+				r.assert(cpu.gpr[at] == (initialValue(v0) < initialValue(v1)), "execution didn't have the expected result");
 			}
 			r.complete();
 		},
@@ -514,8 +522,8 @@ var Tests = {
 			{
 				with (Assembler.registerNames)
 				{
-					var cpu = perform(["slti at, v0, " + v1]);
-					r.assert(cpu.gpr[at] == (cpu.gpr[v0] < v1), "execution didn't have the expected result");
+					var cpu = perform(["slti at, v0, " + initialValue(v1)]);
+					r.assert(cpu.gpr[at] == (initialValue(v0) < initialValue(v1)), "execution didn't have the expected result");
 				}
 				r.complete();
 			},
@@ -525,7 +533,7 @@ var Tests = {
 				with (Assembler.registerNames)
 				{
 					var cpu = perform(["slti at, v0, ffff"]);
-					r.assert(cpu.gpr[at] == (cpu.gpr[v0] < (0xffffffff | 0)), "execution didn't have the expected result");
+					r.assert(cpu.gpr[at] == (initialValue(v0) < (0xffffffff | 0)), "execution didn't have the expected result");
 				}
 				r.complete();
 			}
@@ -535,7 +543,7 @@ var Tests = {
 		{
 			var cpu = perform(["or at, t6, t8"]);
 			with (Assembler.registerNames)
-				r.assert(cpu.gpr[at] == (t6 | t8), "execution didn't have the expected result");
+				r.assert(cpu.gpr[at] == (initialValue(t6) | initialValue(t8)), "execution didn't have the expected result");
 			r.complete();
 		},
 		
@@ -566,7 +574,7 @@ var Tests = {
 				"mfhi at"]);
 			
 			with (Assembler.registerNames)
-				r.assert(cpu.gpr[at] == t8 % k0, "execution didn't have the expected result");
+				r.assert(cpu.gpr[at] == initialValue(t8) % initialValue(k0), "execution didn't have the expected result");
 			r.complete();
 		},
 		
@@ -577,7 +585,7 @@ var Tests = {
 				"mflo at"]);
 			
 			with (Assembler.registerNames)
-				r.assert(cpu.gpr[at] == Math.floor(t8 / k0), "execution didn't have the expected result");
+				r.assert(cpu.gpr[at] == Math.floor(initialValue(t8) / initialValue(k0)), "execution didn't have the expected result");
 			r.complete();
 		},
 		
