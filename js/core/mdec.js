@@ -53,14 +53,14 @@ MotionDecoder.prototype.install = function(hwregs)
 	var self = this;
 	
 	this.dma0.wire(hwregs, 0x1f801080, this.execDMA0.bind(this));
-	this.dma1.wire(h2regs, 0x1f801090, this.execDMA1.bind(this));
+	this.dma1.wire(hwregs, 0x1f801090, this.execDMA1.bind(this));
 	
 	hwregs.wire(0x1f801820,
 		function() { return 0; },
 		function(value) { self.command = value; }
 	);
 	
-	hregs.wire(0x1f80124,
+	hwregs.wire(0x1f80124,
 		function() { return 0; },
 		function(value) {}
 	);

@@ -149,7 +149,10 @@ R3000a.prototype.clock = function(ticks)
 {
 	this.ticks += ticks;
 	if (this.ticks >= 2000000)
+	{
 		this.diags.log("2000000 ticks");
+		this.ticks = 0;
+	}
 }
 
 R3000a.prototype.execute = function(address, context)
@@ -181,6 +184,6 @@ R3000a.prototype.executeOne = function(address, context)
 // ugly linear search
 R3000a.prototype.invalidate = function(address)
 {
-	this.memory.compiled.invalidate(addres);
+	this.memory.compiled.invalidate(address);
 }
 

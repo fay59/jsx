@@ -83,7 +83,11 @@ MemoryMap.unmapped = {
 		// dark magic!
 		var address = getter.caller.arguments[0];
 		if (isFinite(address))
-			console.warn("accessing unmapped memory at address " + address.toString(16));
+		{
+			// we know about 0xfffe0130, thank you
+			if (address != 0xfffe0130)
+				console.warn("accessing unmapped memory at address " + address.toString(16));
+		}
 		else
 			console.warn("accessing unmapped memory--set a breakpoint in memory.js to debug");
 	},

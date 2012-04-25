@@ -48,8 +48,10 @@ var HardwareRegisters = function(mdec)
 	{
 		return function()
 		{
-			var address = (0x1F801000 + index).toString(16);
-			console.warn("reading register " + address);
+			var address = 0x1F801000 + index;
+			var strAddress = address.toString(16);
+			if (HardwareRegisters.unimplementedRegisters.indexOf(address) == -1)
+				console.warn("reading register " + strAddress);
 			return buffer[index >>> shift];
 		};
 	}
@@ -58,8 +60,10 @@ var HardwareRegisters = function(mdec)
 	{
 		return function(value)
 		{
-			var address = (0x1F801000 + index).toString(16);
-			console.warn("writing register " + address + " -> " + value.toString(16));
+			var address = 0x1F801000 + index;
+			var strAddress = address.toString(16);
+			if (HardwareRegisters.unimplementedRegisters.indexOf(address) == -1)
+				console.warn("writing register " + strAddress + " -> " + value.toString(16));
 			buffer[index >>> shift] = value;
 		};
 	}
@@ -97,6 +101,11 @@ var HardwareRegisters = function(mdec)
 		}
 	}
 }
+
+HardwareRegisters.unimplementedRegisters = [
+	0x1f801000, 0x1f801004, 0x1f801008, 0x1f80100c, 0x1f801010, 0x1f80101c,
+	0x1f802041, 0x1f801018, 0x1f8016c0, 0x1f8016c2,
+];
 
 HardwareRegisters.prototype.wire = function(address, getter, setter)
 {

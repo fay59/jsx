@@ -24,12 +24,12 @@ FunctionCache.prototype.saveFunction = function(address, fn)
 	this.compiled[address] = fn;
 }
 
-FunctionCache.property.invoke = function(cpu, address, context)
+FunctionCache.prototype.invoke = function(cpu, address, context)
 {
 	if (!this.functionExists(address))
 		throw new Error("Trying to execute unexistant function");
 	
-	this.compiled[address].code.call(cpu, context);
+	this.compiled[address].code.call(cpu, address, context);
 }
 
 FunctionCache.prototype.invalidate = function(address)
