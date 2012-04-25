@@ -154,7 +154,8 @@ var Tests = {
 		"Read-write ping-pong in RAM area": function(r)
 		{
 			var bios = new GeneralPurposeBuffer(0x80000);
-			var hardwareRegisters = new HardwareRegisters();
+			var mdec = new MotionDecoder();
+			var hardwareRegisters = new HardwareRegisters(mdec);
 			var parallelPort = new ParallelPortMemoryRange();
 			var memory = new MemoryMap(hardwareRegisters, parallelPort, bios);
 			
@@ -595,7 +596,7 @@ var Tests = {
 			var missingInstructions = [];
 			var instructionCount = 0;
 			var recompiler = new Recompiler();
-			recompiler.memory = new MemoryCache(null);
+			recompiler.memory = new MemoryCache({compiled: null});
 			recompiler.unimplementedInstructionCounts = {};
 			for (var instruction in Disassembler.patternData)
 			{

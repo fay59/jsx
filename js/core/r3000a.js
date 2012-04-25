@@ -16,7 +16,6 @@ var R3000a = function()
 {
 	this.stopped = false;
 	this.memory = null;
-	this.recompiler = new Recompiler();
 	this.ticks = 0;
 	
 	this.diags = console;
@@ -74,7 +73,6 @@ R3000a.srFlags = {
 R3000a.prototype.setDiagnosticsOutput = function(diags)
 {
 	this.diags = diags;
-	this.recompiler.diags = diags;
 	if (this.memory != null)
 		this.memory.diags = diags;
 }
@@ -158,27 +156,12 @@ R3000a.prototype.clock = function(ticks)
 R3000a.prototype.execute = function(address, context)
 {
 	this.stopped = false;
-	
-	if (!this.memory.compiled.functionExists(address))
-	{
-		try
-		{
-			var compiled = this.recompiler.recompileFunction(this.memory, address, context);
-			this.memory.compiled.saveFunction(address, compiled);
-		}
-		catch (e)
-		{
-			throw new ExecutionException("A recompilation exception prevented the program from continuing", address, e);
-		}
-	}
-	
 	this.memory.compiled.invoke(this, address, context);
 }
 
 R3000a.prototype.executeOne = function(address, context)
 {
-	var func = this.recompiler.recompileOne(this.memory, address, context);
-	return func.call(this, context);
+	return this.memory.compiled.executeOne(this.memory, address, context);
 }
 
 // ugly linear search

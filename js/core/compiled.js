@@ -1,17 +1,38 @@
-var FunctionCache = function()
+var FunctionCache = function(memory)
 {
-	this.reset();
+	this.reset(memory);
 }
 
-FunctionCache.prototype.reset = function()
+FunctionCache.prototype.reset = function(memory)
 {
+	this.invalidationMap = new Uint32Array(0x200000 >>> 8);
+	this.callCount = 0;
+	this.recompiler = new Recompiler();
+	this.memory = memory;
 	this.compiled = {};
-	this.invalidationMap = new Uint32Array(0x200000);
 }
 
 FunctionCache.prototype.functionExists = function(address)
 {
 	return address in this.compiled;
+}
+
+FunctionCache.prototype.functionDirty = function(address)
+{
+	var fn = this.compiled[address];
+	for (var i = 0; i < fn.ranges.length; i++)
+	{
+		var range = fn.ranges[i];
+		for (var j = range[0]; j < range[1]; j += 0x100)
+		{
+			if (this.invalidationMap[j >>> 8] > fn.jitTime)
+			{
+				delete this.compiled[address];
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 FunctionCache.prototype.getFunction = function(address)
@@ -21,69 +42,42 @@ FunctionCache.prototype.getFunction = function(address)
 
 FunctionCache.prototype.saveFunction = function(address, fn)
 {
+	fn.jitTime = this.callCount;
 	this.compiled[address] = fn;
-}
-
-FunctionCache.prototype.invoke = function(cpu, address, context)
-{
-	if (!this.functionExists(address))
-		throw new Error("Trying to execute unexistant function");
-	
-	this.compiled[address].code.call(cpu, address, context);
 }
 
 FunctionCache.prototype.invalidate = function(address)
 {
-	// TODO speed me up!
-	var keysToRemove = [];
-	
-allFunctions:
-	for (var key in this.compiled)
-	{
-		var fn = this.compiled[key];
-		for (var i = 0; i < fn.ranges.length; i++)
-		{
-			var range = fn.ranges[i];
-			if (address >= range[0] && address <= range[1])
-			{
-				keysToRemove.push(key);
-				continue allFunctions;
-			}
-		}
-	}
-	
-	for (var i = 0; i < keysToRemove.length; i++)
-		delete this.compiled[keysToRemove[i]];
+	this.invalidationMap[address >>> 8] = this.callCount;
 }
 
 FunctionCache.prototype.invalidateRange = function(start, size)
 {
-	// TODO speed me up!
-	var keysToRemove = [];
-	var end = start + size;
-	
-allFunctions:
-	for (var key in this.compiled)
+	for (var i = 0; i < size; i += 0x100)
+		this.invalidationMap[(start + i) >>> 8] = this.callCount;
+}
+
+FunctionCache.prototype.invoke = function(cpu, address, context)
+{
+	if (!this.functionExists(address) || this.functionDirty(address))
 	{
-		var fn = this.compiled[key];
-		for (var i = 0; i < fn.ranges.length; i++)
+		try
 		{
-			var range = fn.ranges[i];
-			if (FunctionCache.rangeOverlaps(start, end, range[0], range[1])
-			 || FunctionCache.rangeOverlaps(range[0], range[1], start, end))
-			{
-				keysToRemove.push(key);
-				continue allFunctions;
-			}
+			var compiled = this.recompiler.recompileFunction(this.memory, address, context);
+			this.saveFunction(address, compiled);
+		}
+		catch (e)
+		{
+			throw new ExecutionException("A recompilation exception prevented the program from continuing", address, e);
 		}
 	}
 	
-	for (var i = 0; i < keysToRemove.length; i++)
-		delete this.compiled[keysToRemove[i]];
+	this.callCount++;
+	this.compiled[address].code.call(cpu, address, context);
 }
 
-FunctionCache.rangeOverlaps = function(s1, e1, s2, e2)
+FunctionCache.prototype.executeOne = function(cpu, address, context)
 {
-	return (s1 >= s2 && s1 <= e2)
-		|| (e1 >= s2 && e1 <= e2);
+	var func = this.recompiler.recompileOne(this.memory, address, context);
+	return func.call(cpu, context);
 }

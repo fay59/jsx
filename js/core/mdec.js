@@ -97,6 +97,8 @@ MotionDecoder.prototype.execDMA1 = function()
 	if (this.dma1.chcr != 0x01000200)
 		return;
 	
+	console.log("Doing DMA1");
+	
 	var dataSize = this.dma1.getSize();
 	this.memory.compiled.invalidateRange(this.dma1.madr, dataSize);
 	

@@ -49,26 +49,6 @@ var Debugger = function(cpu)
 		this.cpu.gpr.__defineSetter__(i, gprSetter(i));
 		this.lastRegWrites.push(0);
 	}
-	
-	// interpose for recompilation
-	this.cpu.recompiler.injector = {
-		injectBeforeInstruction: function(address, opcode)
-		{
-			var jsCode = "context._pc = " + address + ";\n";
-			if (self.breakpoints.hasEnabledBreakpoint(address))
-				jsCode += "context.breakpoints.hit(" + address + ");\n";
-			
-			if (opcode.instruction.name == 'jal' || opcode.instruction.name == 'jalr')
-			{
-				jsCode += "context._enterFunction(0x" + address.toString(16) + ");\n";
-			}
-			else if (opcode.instruction.name == 'jr' && opcode.params[0] == 31)
-			{
-				jsCode += "context._leaveFunction();\n";
-			}
-			return jsCode;
-		}
-	};
 }
 
 Debugger.STEPPED_EVENT = "stepped";
@@ -99,12 +79,34 @@ Debugger.prototype.removeEventListener = function(event, listener)
 
 Debugger.prototype.reset = function(pc, memory)
 {
+	var self = this;
+	
 	this.pc = pc;
 	this.stack = [this.pc];
 	this.cpu.reset(memory);
 	this.breakpoints.resetHits();
 	for (var i = 0; i < this.lastRegWrites.length; i++)
 		this.lastRegWrites[i] = 0;
+	
+	// interpose for recompilation
+	memory.compiled.recompiler.injector = {
+		injectBeforeInstruction: function(address, opcode)
+		{
+			var jsCode = "context._pc = " + address + ";\n";
+			if (self.breakpoints.hasEnabledBreakpoint(address))
+				jsCode += "context.breakpoints.hit(" + address + ");\n";
+			
+			if (opcode.instruction.name == 'jal' || opcode.instruction.name == 'jalr')
+			{
+				jsCode += "context._enterFunction(0x" + address.toString(16) + ");\n";
+			}
+			else if (opcode.instruction.name == 'jr' && opcode.params[0] == 31)
+			{
+				jsCode += "context._leaveFunction();\n";
+			}
+			return jsCode;
+		}
+	};
 	
 	this._eventCallback("stepped");
 	this._eventCallback("steppedinto");

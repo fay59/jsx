@@ -32,7 +32,7 @@ var MemoryMap = function(hardware, parallelPort, bios)
 		throw new Error("undefined parameters are not allowed");
 	
 	this.diags = console;
-	this.compiled = new FunctionCache();
+	this.compiled = null;
 	
 	this.ram = new GeneralPurposeBuffer(0x200000);
 	this.scratchpad = new GeneralPurposeBuffer(0x400);
@@ -109,7 +109,7 @@ MemoryMap.unmapped = {
 
 MemoryMap.prototype.reset = function()
 {
-	this.compiled = new FunctionCache();
+	this.compiled = new FunctionCache(this);
 }
 
 MemoryMap.prototype.translate = function(address)
