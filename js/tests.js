@@ -87,7 +87,8 @@ var TestResult = function(element)
 }
 
 var bios = new GeneralPurposeBuffer(0x80000);
-var hardwareRegisters = new HardwareRegisters();
+var mdec = new MotionDecoder();
+var hardwareRegisters = new HardwareRegisters(mdec);
 var parallelPort = new ParallelPortMemoryRange();
 
 function initialValue(register)

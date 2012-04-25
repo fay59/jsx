@@ -14,6 +14,7 @@ var MemoryCache = function(memory)
 {
 	// just hide stuff till IsC goes out in the SR
 	this.hidden = memory;
+	this.compiled = memory.compiled;
 }
 
 MemoryCache.returnZero = function() { return 0; }
@@ -31,6 +32,7 @@ var MemoryMap = function(hardware, parallelPort, bios)
 		throw new Error("undefined parameters are not allowed");
 	
 	this.diags = console;
+	this.compiled = new FunctionCache();
 	
 	this.ram = new GeneralPurposeBuffer(0x200000);
 	this.scratchpad = new GeneralPurposeBuffer(0x400);
@@ -100,6 +102,11 @@ MemoryMap.unmapped = {
 		return this.u32Array;
 	}
 };
+
+MemoryMap.prototype.reset = function()
+{
+	this.compiled = new FunctionCache();
+}
 
 MemoryMap.prototype.translate = function(address)
 {

@@ -3,10 +3,10 @@ var dbg = null;
 var memory = null;
 
 document.addEventListener("DOMContentLoaded", including.bind(null,
-	"js/core/disasm.js", "js/core/r3000a.js", "js/core/hwregs.js", "js/core/parallel.js",
-	"js/core/memory.js", "js/core/recompiler.js", "js/core/asm.js",
-	"js/debugger/debugger.js", "js/debugger/disasm-table.js", "js/debugger/breakpoint.js",
-	"js/debugger/breakpoint-table.js",
+	"js/core/disasm.js", "js/core/r3000a.js", "js/core/compiled.js", "js/core/hwregs.js",
+	"js/core/parallel.js", "js/core/memory.js", "js/core/recompiler.js", "js/core/asm.js",
+	"js/core/mdec.js", "js/debugger/debugger.js", "js/debugger/disasm-table.js",
+	"js/debugger/breakpoint.js", "js/debugger/breakpoint-table.js",
 	function() {
 	const disassemblyLength = 25;
 	
@@ -156,9 +156,11 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 		reader.onload = function()
 		{
 			var bios = new GeneralPurposeBuffer(reader.result);
-			var hardwareRegisters = new HardwareRegisters();
+			var mdec = new MotionDecoder();
+			var hardwareRegisters = new HardwareRegisters(mdec);
 			var parallelPort = new ParallelPortMemoryRange();
 			memory = new MemoryMap(hardwareRegisters, parallelPort, bios);
+			mdec.reset(memory);
 			
 			reset();
 		}

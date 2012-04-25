@@ -5,6 +5,11 @@ var DMARegisters = function()
 	this.chcr = 0; // command to take
 }
 
+DMARegisters.prototype.getSize = function()
+{
+	return (this.bcr >>> 16) * (this.bcr & 0xffff);
+}
+
 DMARegisters.prototype.wire = function(hwregs, address, action)
 {
 	var self = this;

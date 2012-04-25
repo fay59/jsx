@@ -31,9 +31,6 @@ var R3000a = function()
 	// no fancy structures like PCSX has because nothing uses them
 	this.cop2_data = new Uint32Array(this.registerMemory, (34 + 16) * 4, 32);
 	this.cop2_ctl = new Uint32Array(this.registerMemory, (34 + 16 + 32) * 4, 32);
-	
-	this.currentFunction = 0;
-	this.compiled = {};
 }
 
 R3000a.bootAddress = 0xBFC00000;
@@ -96,7 +93,7 @@ R3000a.prototype.__crash = function()
 	this.gpr = null;
 	this.fgr = null;
 	this.cop0_reg = null;
-	this.compiled = null;
+	this.memory = null;
 }
 
 R3000a.prototype.stop = function()
@@ -108,6 +105,7 @@ R3000a.prototype.reset = function(memory)
 {
 	this.memory = memory;
 	this.memory.diags = this.diags;
+	this.memory.reset();
 	
 	for (var i = 0; i < 32; i++)
 	{
@@ -123,8 +121,6 @@ R3000a.prototype.reset = function(memory)
 	// values taken from pSX's debugger at reset
 	this.cop0_reg[12] = 0x00400002;
 	this.cop0_reg[15] = 0x00000230;
-	
-	this.compiled = {};
 }
 
 R3000a.prototype.writeCOP0 = function(reg, value)
@@ -160,12 +156,12 @@ R3000a.prototype.execute = function(address, context)
 {
 	this.stopped = false;
 	
-	if (!(address in this.compiled))
+	if (!this.memory.compiled.functionExists(address))
 	{
 		try
 		{
 			var compiled = this.recompiler.recompileFunction(this.memory, address, context);
-			this.compiled[address] = compiled;
+			this.memory.compiled.saveFunction(address, compiled);
 		}
 		catch (e)
 		{
@@ -173,7 +169,7 @@ R3000a.prototype.execute = function(address, context)
 		}
 	}
 	
-	this.compiled[address].code.call(this, address, context);
+	this.memory.compiled.invoke(this, address, context);
 }
 
 R3000a.prototype.executeOne = function(address, context)
@@ -185,18 +181,6 @@ R3000a.prototype.executeOne = function(address, context)
 // ugly linear search
 R3000a.prototype.invalidate = function(address)
 {
-	for (var startAddress in this.compiled)
-	{
-		var code = this.compiled[startAddress];
-		for (var i = 0; i < code.ranges.length; i++)
-		{
-			var range = code.ranges[i];
-			if (range[0] <= address && range[1] >= address)
-			{
-				delete this.compiled[startAddress];
-				break;
-			}
-		}
-	}
+	this.memory.compiled.invalidate(addres);
 }
 

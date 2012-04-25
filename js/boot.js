@@ -6,9 +6,12 @@ document.addEventListener('DOMContentLoaded', function()
 		reader.onload = function()
 		{
 			var bios = new GeneralPurposeBuffer(reader.result);
-			var hardwareRegisters = new HardwareRegisters();
+			var mdec = new MemoryDecoder();
+			var hardwareRegisters = new HardwareRegisters(mdec);
 			var parallelPort = new ParallelPortMemoryRange();
 			var memory = new MemoryMap(hardwareRegisters, parallelPort, bios);
+			
+			mdec.memory = memory;
 			
 			var psx = new R3000a();
 			psx.reset(memory);
