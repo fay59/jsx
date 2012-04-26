@@ -48,11 +48,12 @@ FunctionCache.prototype.saveFunction = function(address, fn)
 
 FunctionCache.prototype.invalidate = function(address)
 {
-	this.invalidationMap[address >>> 8] = this.callCount;
+	this.invalidationMap[(address & 0x1fffffff) >>> 8] = this.callCount;
 }
 
 FunctionCache.prototype.invalidateRange = function(start, size)
 {
+	address &= 0x1fffffff;
 	for (var i = 0; i < size; i += 0x100)
 		this.invalidationMap[(start + i) >>> 8] = this.callCount;
 }

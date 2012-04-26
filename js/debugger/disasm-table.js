@@ -84,8 +84,14 @@ DisassemblyTable.prototype.disassemble = function(memory, address, gotoHandler, 
 	actionTD.addEventListener("click", gotoHandler);
 	addressTD.addEventListener("click", bpHandler);
 	
-	if (comment == "nop")
+	if (comment === undefined)
+	{
+		tr.classList.add("invalid");
+		comment = "undefined (" + Recompiler.formatHex(bits) + ")";
+	}
+	else if (comment == "nop")
 		tr.classList.add("nop");
+	
 	if (translated.buffer == MemoryMap.unmapped)
 		tr.classList.add("invalid");
 	else if (comment !== undefined && (comment[0] == "j" || comment[0] == "b"))

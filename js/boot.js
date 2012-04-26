@@ -1,12 +1,15 @@
-document.addEventListener('DOMContentLoaded', function()
-{
+document.addEventListener("DOMContentLoaded", including.bind(null,
+	"js/core/disasm.js", "js/core/r3000a.js", "js/core/compiled.js", "js/core/hwregs.js",
+	"js/core/parallel.js", "js/core/memory.js", "js/core/recompiler.js", "js/core/asm.js",
+	"js/core/mdec.js", function()
+	{
 	document.querySelector("#bios").addEventListener("change", function()
 	{
 		var reader = new FileReader();
 		reader.onload = function()
 		{
 			var bios = new GeneralPurposeBuffer(reader.result);
-			var mdec = new MemoryDecoder();
+			var mdec = new MotionDecoder();
 			var hardwareRegisters = new HardwareRegisters(mdec);
 			var parallelPort = new ParallelPortMemoryRange();
 			var memory = new MemoryMap(hardwareRegisters, parallelPort, bios);
@@ -18,7 +21,7 @@ document.addEventListener('DOMContentLoaded', function()
 			
 			try
 			{
-				psx.execute(R3000a.bootAddress);
+				psx.run();
 			}
 			catch (e)
 			{
@@ -27,9 +30,12 @@ document.addEventListener('DOMContentLoaded', function()
 				var totalJitted = 0;
 				var totalUnimplemented = 0;
 				var unimplemented = {};
-				for (var fn in psx.compiled)
+				
+				var compiled = psx.memory.compiled.compiled;
+				var recompiler = psx.memory.compiled.recompiler;
+				for (var fn in psx.memory.compiled.compiled)
 				{
-					var func = psx.compiled[fn];
+					var func = compiled[fn];
 					totalJitted += func.totalCount;
 					for (var key in func.unimplemented)
 					{
@@ -42,17 +48,16 @@ document.addEventListener('DOMContentLoaded', function()
 					}
 				}
 				
-				totalJitted += psx.recompiler.jittedInstructions;
-				for (var key in psx.recompiler.unimplementedInstructionCounts)
+				totalJitted += recompiler.jittedInstructions;
+				for (var key in recompiler.unimplementedInstructionCounts)
 				{
 					if (!(key in unimplemented))
 						unimplemented[key] = 0;
 					
-					var count = func.unimplemented[key];
+					var count = recompiler.unimplementedInstructionCounts[key];
 					unimplemented[key] += count;
 					totalUnimplemented += count;
 				}
-				
 				
 				var list = document.querySelector("#missing");
 				for (var key in unimplemented)
@@ -68,4 +73,4 @@ document.addEventListener('DOMContentLoaded', function()
 		
 		reader.readAsArrayBuffer(this.files[0]);
 	});
-});
+}));

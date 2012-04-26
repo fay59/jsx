@@ -9,7 +9,7 @@ var Recompiler = function()
 	this.addressesToCompile = [];
 	this.calls = [];
 	this.address = 0;
-	this.epc = 0; // the place to set EPC in case of an exception
+	this.isDelaySlot = false; // if the instruction is in a delay slot
 	this.opcodes = {};
 	this.injector = null;
 }
@@ -26,7 +26,6 @@ Recompiler.prototype.recompileFunction = function(memory, startAddress)
 	this.addressesToCompile = [startAddress];
 	this.calls = [];
 	this.address = 0;
-	this.epc = 0;
 	this.opcodes = {};
 	
 	this.unimplementedInstructionCounts = {};
@@ -44,8 +43,6 @@ Recompiler.prototype.recompileFunction = function(memory, startAddress)
 		while (!(this.address in this.code))
 		{
 			var currentAddress = this.address;
-			this.epc = currentAddress;
-			
 			var op = this.nextInstruction();
 			this.code[currentAddress] = this.recompileOpcode(currentAddress, op);
 			
@@ -431,12 +428,21 @@ Recompiler.formatHex = function(address, length)
 	
 	function delaySlot()
 	{
-		var delaySlot = this.nextInstruction();
-		if (delaySlot.instruction.name[0] == 'b' || delaySlot.instruction.name[0] == 'j')
-			return "this.panic('branch in delay slot is undefined behavior', " + (this.address - 4) + ");\n";
-		var jsCode = "// delay slot: " + Disassembler.getOpcodeAsString(delaySlot) + "\n";
-		jsCode += this[delaySlot.instruction.name].apply(this, delaySlot.params);
-		return jsCode;
+		this.delaySlot = true;
+		try
+		{
+			var delaySlot = this.nextInstruction();
+			if (delaySlot.instruction.name[0] == 'b' || delaySlot.instruction.name[0] == 'j')
+				return "this.panic('branch in delay slot is undefined behavior', " + (this.address - 4) + ");\n";
+			
+			var jsCode = "// delay slot: " + Disassembler.getOpcodeAsString(delaySlot) + "\n";
+			jsCode += this[delaySlot.instruction.name].apply(this, delaySlot.params);
+			return jsCode;
+		}
+		finally
+		{
+			this.delaySlot = false;
+		}
 	}
 	
 	function jump(targetWord)
@@ -700,11 +706,11 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("mfhi", function(d) {
-		return gpr(d) + " = this.gpr[32];\n";
+		return gpr(d) + " = " + gpr(32) + ";\n";
 	});
 	
 	impl("mflo", function(d) {
-		return gpr(d) + " = this.gpr[33];\n";
+		return gpr(d) + " = " + gpr(33) + ";\n";
 	});
 	
 	impl("mtc0", function(t, l) {
@@ -716,14 +722,12 @@ Recompiler.formatHex = function(address, length)
 		return panic("mtc2 is not implemented", this.address - 4);
 	});
 	
-	impl("mthi", function() {
-		countUnimplemented.call(this, "mthi");
-		return panic("mthi is not implemented", this.address - 4);
+	impl("mthi", function(d) {
+		return gpr(32) + " = " + gpr(d) + ";\n";
 	});
 	
-	impl("mtlo", function() {
-		countUnimplemented.call(this, "mtlo");
-		return panic("mtlo is not implemented", this.address - 4);
+	impl("mtlo", function(d) {
+		return gpr(33) + " = " + gpr(d) + ";\n";
 	});
 	
 	impl("mult", function() {
@@ -888,8 +892,7 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("syscall", function() {
-		countUnimplemented.call(this, "syscall");
-		return panic("syscall is not implemented", this.address - 4);
+		return "this.raiseException(" + hex(this.address) + ", 0x20, " + this.isDelaySlot + ");\n";
 	});
 	
 	impl("xor", function() {

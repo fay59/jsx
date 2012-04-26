@@ -157,7 +157,12 @@ Debugger.prototype.stepOver = function()
 		}
 		catch (ex)
 		{
-			this._handleException(ex);
+			if (ex.constructor != HardwareException)
+			{
+				this._handleException(ex);
+				return;
+			}
+			this.pc = ex.handler;
 		}
 	}
 	this._eventCallback("stepped");
@@ -200,7 +205,21 @@ Debugger.prototype.stepInto = function()
 
 Debugger.prototype.stepOut = function()
 {
-	this.cpu.execute(this.pc, this);
+	do
+	{
+		try
+		{
+			this.cpu.execute(this.pc, this);
+		}
+		catch (ex)
+		{
+			if (ex.constructor != HardwareException)
+				throw ex;
+			this.pc = ex.handler;
+			continue;
+		}
+	} while (false);
+	
 	this.pc = this.stack.pop();
 	this._eventCallback("steppedout");
 	this._eventCallback("stepped");
@@ -229,8 +248,17 @@ Debugger.prototype.run = function()
 	{
 		while (true)
 		{
-			this.cpu.execute(this.pc, this);
-			this.pc = this.cpu.gpr[31];
+			try
+			{
+				this.cpu.execute(this.pc, this);
+				this.pc = this.cpu.gpr[31];
+			}
+			catch (ex)
+			{
+				if (ex.constructor != HardwareException)
+					throw ex;
+				this.pc = ex.handler;
+			}
 		}
 	}
 	catch (ex)
@@ -270,7 +298,7 @@ Debugger.prototype._handleException = function(ex)
 	}
 	else
 	{
-		this.diags.error(ex.message);
+		this.diags.error(ex.toString());
 	}
 }
 

@@ -12,6 +12,16 @@ ExecutionException.prototype.toString = function()
 	return this.message;
 }
 
+var HardwareException = function(handler)
+{
+	this.handler = handler;
+}
+
+HardwareException.prototype.toString = function()
+{
+	return "Hardware exception, control jumping to " + Recompiler.formatHex(this.handler);
+}
+
 var R3000a = function()
 {
 	this.stopped = false;
@@ -32,7 +42,7 @@ var R3000a = function()
 	this.cop2_ctl = new Uint32Array(this.registerMemory, (34 + 16 + 32) * 4, 32);
 }
 
-R3000a.bootAddress = 0xBFC00000;
+R3000a.bootAddress = 0xbfc00000;
 
 R3000a.exceptions = {
 	reset: -1, // no matching bit in the Cause register
@@ -121,6 +131,25 @@ R3000a.prototype.reset = function(memory)
 	this.cop0_reg[15] = 0x00000230;
 }
 
+R3000a.prototype.raiseException = function(epc, exception, inDelaySlot)
+{
+	this.cop0_reg[13] = exception;
+	this.cop0_reg[14] = epc;
+	
+	if (inDelaySlot)
+	{
+		this.cop0_reg[13] |= 0x80000000;
+		this.cop0_reg[14] -= 4;
+	}
+	
+	this.cop0_reg[12] = (this.cop0_reg[12] & ~0x3f) | ((this.cop0_reg[12] & 0xf) << 2);
+	
+	var handlerAddress = (this.cop0_reg[12] & 0x400000) == 0x400000
+		? 0xbfc00180 : 0x80000080;
+	
+	throw new HardwareException(handlerAddress);
+}
+
 R3000a.prototype.writeCOP0 = function(reg, value)
 {
 	var oldValue = this.cop0_reg[reg];
@@ -153,15 +182,35 @@ R3000a.prototype.clock = function(ticks)
 	}
 }
 
+R3000a.prototype.run = function()
+{
+	var pc = R3000a.bootAddress;
+	while (true)
+	{
+		try
+		{
+			this.execute(pc);
+			pc = this.gpr[31];
+		}
+		catch (ex)
+		{
+			if (ex.constructor != HardwareException)
+				throw ex;
+			
+			pc = ex.handler;
+		}
+	}
+}
+
 R3000a.prototype.execute = function(address, context)
 {
 	this.stopped = false;
-	this.memory.compiled.invoke(this, address, context);
+	return this.memory.compiled.invoke(this, address, context);
 }
 
 R3000a.prototype.executeOne = function(address, context)
 {
-	return this.memory.compiled.executeOne(this.memory, address, context);
+	return this.memory.compiled.executeOne(this, address, context);
 }
 
 // ugly linear search

@@ -365,7 +365,7 @@ Disassembler.patternData = {
 		format: 'ori {t}, {s}, {i}'
 	},
 	'rfe': {	// return from exception
-		pattern: '0100 0010 0000 0000 0000 0000 0010 0000',
+		pattern: '0100 0010 0000 0000 0000 0000 0001 0000',
 		format: 'rfe'
 	},
 	'rtps': {
