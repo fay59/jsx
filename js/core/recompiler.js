@@ -794,8 +794,7 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("rfe", function() {
-		countUnimplemented.call(this, "rfe");
-		return panic("rfe is not implemented", this.address - 4);
+		return "this.writeCOP0(12, (this.cop0_reg[12] & 0xfffffff0) | (this.cop0_reg[12] >>> 2));\n";
 	});
 	
 	impl("rtps", function() {
