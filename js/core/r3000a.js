@@ -12,16 +12,6 @@ ExecutionException.prototype.toString = function()
 	return this.message;
 }
 
-var HardwareException = function(handler)
-{
-	this.handler = handler;
-}
-
-HardwareException.prototype.toString = function()
-{
-	return "Hardware exception, control jumping to " + Recompiler.formatHex(this.handler);
-}
-
 var R3000a = function()
 {
 	this.stopped = false;
@@ -147,7 +137,7 @@ R3000a.prototype.raiseException = function(epc, exception, inDelaySlot)
 	var handlerAddress = (this.cop0_reg[12] & 0x400000) == 0x400000
 		? 0xbfc00180 : 0x80000080;
 	
-	throw new HardwareException(handlerAddress);
+	return handlerAddress;
 }
 
 R3000a.prototype.writeCOP0 = function(reg, value)
@@ -175,34 +165,26 @@ R3000a.prototype.writeCOP0 = function(reg, value)
 R3000a.prototype.clock = function(ticks)
 {
 	this.ticks += ticks;
-	if (this.ticks >= 2000000)
+	if (this.ticks >= 10000000)
 	{
-		this.diags.log("2000000 ticks");
+		this.diags.log("10000000 ticks");
 		this.ticks = 0;
 	}
 }
 
-R3000a.prototype.run = function()
+R3000a.prototype.run = function(pc, context)
 {
-	var pc = R3000a.bootAddress;
+	if (pc === undefined)
+		pc = R3000a.bootAddress;
+	
 	while (true)
 	{
-		try
-		{
-			this.execute(pc);
-			pc = this.gpr[31];
-		}
-		catch (ex)
-		{
-			if (ex.constructor != HardwareException)
-				throw ex;
-			
-			pc = ex.handler;
-		}
+		var newAddress = this.executeBlock(pc, context);
+		pc = newAddress;
 	}
 }
 
-R3000a.prototype.execute = function(address, context)
+R3000a.prototype.executeBlock = function(address, context)
 {
 	this.stopped = false;
 	return this.memory.compiled.invoke(this, address, context);

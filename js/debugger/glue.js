@@ -30,7 +30,6 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 	var runButton = document.querySelector("#run");
 	var stepOverButton = document.querySelector("#step-over");
 	var stepIntoButton = document.querySelector("#step-into");
-	var stepOutButton = document.querySelector("#step-out");
 	var pauseButton = document.querySelector("#pause");
 	var goToButton = document.querySelector("#goto");
 	var disasmContainer = document.querySelector("#disasm-container");
@@ -270,7 +269,6 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 	var run = dbg.run.bind(dbg);
 	var stepOver = dbg.stepOver.bind(dbg);
 	var stepInto = dbg.stepInto.bind(dbg);
-	var stepOut = dbg.stepOut.bind(dbg);
 	
 	function pause()
 	{
@@ -292,7 +290,6 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 	runButton.addEventListener("click", run);
 	stepOverButton.addEventListener("click", stepOver);
 	stepIntoButton.addEventListener("click", stepInto);
-	stepOutButton.addEventListener("click", stepOut);
 	pauseButton.addEventListener("click", pause);
 	goToButton.addEventListener("click", goTo);
 	
@@ -311,7 +308,6 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 		{
 			case 13: stepOver(); break;
 			case 27: pause(); break;
-			case 37: stepOut(); break;
 			case 39:
 				if (dbg.canStepInto())
 					dbg.stepInto();

@@ -157,12 +157,7 @@ Debugger.prototype.stepOver = function()
 		}
 		catch (ex)
 		{
-			if (ex.constructor != HardwareException)
-			{
-				this._handleException(ex);
-				return;
-			}
-			this.pc = ex.handler;
+			this._handleException(ex);
 		}
 	}
 	this._eventCallback("stepped");
@@ -203,28 +198,6 @@ Debugger.prototype.stepInto = function()
 	this._eventCallback("stepped");
 }
 
-Debugger.prototype.stepOut = function()
-{
-	do
-	{
-		try
-		{
-			this.cpu.execute(this.pc, this);
-		}
-		catch (ex)
-		{
-			if (ex.constructor != HardwareException)
-				throw ex;
-			this.pc = ex.handler;
-			continue;
-		}
-	} while (false);
-	
-	this.pc = this.stack.pop();
-	this._eventCallback("steppedout");
-	this._eventCallback("stepped");
-}
-
 Debugger.prototype.runUntil = function(desiredPC)
 {
 	if (!isFinite(desiredPC))
@@ -246,20 +219,7 @@ Debugger.prototype.run = function()
 {
 	try
 	{
-		while (true)
-		{
-			try
-			{
-				this.cpu.execute(this.pc, this);
-				this.pc = this.cpu.gpr[31];
-			}
-			catch (ex)
-			{
-				if (ex.constructor != HardwareException)
-					throw ex;
-				this.pc = ex.handler;
-			}
-		}
+		this.cpu.run(this.pc, this);
 	}
 	catch (ex)
 	{
@@ -290,15 +250,10 @@ Debugger.prototype._handleException = function(ex)
 		this.diags.log("stopped at " + this.pc);
 		this._eventCallback("stepped");
 	}
-	else if (ex.constructor == ExecutionException)
-	{
-		this.diags.error(ex.cause ? ex.cause.message : ex.message);
-		this.pc = ex.pc;
-		this._eventCallback("stepped");
-	}
 	else
 	{
 		this.diags.error(ex.toString());
+		this._eventCallback("stepped");
 	}
 }
 

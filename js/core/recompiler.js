@@ -233,6 +233,7 @@ Recompiler.prototype.compile = function()
 		code: compiled,
 		
 		references: this.calls,
+		labels: this.compiledAddresses,
 		
 		ranges: this.ranges,
 		totalCount: this.jittedInstructions,
@@ -445,18 +446,6 @@ Recompiler.formatHex = function(address, length)
 		}
 	}
 	
-	function jump(targetWord)
-	{
-		var opAddress = this.address - 4;
-		var jumpAddress = Recompiler.unsign((opAddress & 0xF0000000) | (targetWord << 2));
-		this.addLabel(jumpAddress, opAddress);
-		
-		var jsCode = "pc = " + hex(jumpAddress) + ";\n";
-		jsCode += delaySlot.call(this);
-		jsCode += "break;\n";
-		return jsCode;
-	}
-	
 	function branch(condition, offset)
 	{
 		var opAddress = this.address;
@@ -623,7 +612,9 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("j", function(i) {
-		return jump.call(this, i);
+		var opAddress = this.address - 4;
+		var jumpAddress = Recompiler.unsign((opAddress & 0xF0000000) | (i << 2));
+		return "return " + hex(jumpAddress) + ";\n";
 	});
 	
 	impl("jal", function(i) {
@@ -631,29 +622,22 @@ Recompiler.formatHex = function(address, length)
 		
 		var jsCode = delaySlot.call(this);
 		jsCode += gpr(31) + " = " + hex(this.address) + ";\n";
-		jsCode += "this.execute(" + hex(jumpAddress) + ", context);\n";
+		jsCode += "return " + hex(jumpAddress) + ";\n";
+		
 		return jsCode;
 	});
 	
 	impl("jalr", function(s, d) {
 		var jsCode = delaySlot.call(this);
 		jsCode += gpr(d) + " = " + hex(this.address) + ";\n"
-		jsCode += "this.execute(" + gpr(s) + ", context);\n";
+		jsCode += "return " + gpr(s) + ";\n";
+		
+		this.addLabel(this.address);
 		return jsCode;
 	});
 	
 	impl("jr", function(s) {
-		var jsCode = delaySlot.call(this);
-		
-		// 'jr ra' usually means 'return'
-		if (s == 31)
-			jsCode += "return;\n";
-		else
-		{
-			jsCode += "this.execute(" + gpr(s) + ", context);\n";
-			jsCode += "return;\n";
-		}
-		return jsCode;
+		return delaySlot.call(this) + "return " + gpr(s) + ";\n";
 	});
 	
 	impl("lb", function(s, t, i) {
@@ -891,7 +875,7 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("syscall", function() {
-		return "this.raiseException(" + hex(this.address) + ", 0x20, " + this.isDelaySlot + ");\n";
+		return "return this.raiseException(" + hex(this.address) + ", 0x20, " + this.isDelaySlot + ");\n";
 	});
 	
 	impl("xor", function() {

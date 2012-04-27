@@ -60,7 +60,7 @@ MotionDecoder.prototype.install = function(hwregs)
 		function(value) { self.command = value; }
 	);
 	
-	hwregs.wire(0x1f80124,
+	hwregs.wire(0x1f801824,
 		function() { return 0; },
 		function(value) {}
 	);

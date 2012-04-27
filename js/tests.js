@@ -124,7 +124,7 @@ function perform(opcodes)
 {
 	var cpu = testCPU();
 	var address = writeInstructions(cpu.memory, opcodes);
-	cpu.execute(address);
+	cpu.executeBlock(address);
 	return cpu;
 }
 
@@ -148,6 +148,28 @@ var Tests = {
 			verify(parallel.u8);
 			verify(parallel.u16);
 			verify(parallel.u32);
+			r.complete();
+		},
+		
+		"Hardware registers are contiguous": function(r)
+		{
+			function verify(a, name)
+			{
+				for (var i = 0; i < a.length; i++)
+				{
+					if (!isFinite(a[i]))
+					{
+						r.fail(name + " is non-contiguous at index " + i);
+						return;
+					}
+				}
+			}
+			
+			var mdec = new MotionDecoder();
+			var hardware = new HardwareRegisters(mdec);
+			verify(hardware.u8, "u8");
+			verify(hardware.u16, "u16");
+			verify(hardware.u32, "u32");
 			r.complete();
 		},
 		

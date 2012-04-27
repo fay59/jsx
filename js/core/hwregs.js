@@ -74,24 +74,24 @@ var HardwareRegisters = function(mdec)
 	var u16 = new Uint16Array(this.backbuffer);
 	var u32 = new Uint32Array(this.backbuffer);
 	
-	this.u8 = {};
-	this.u16 = {};
-	this.u32 = {};
+	this.u8 = {length: 0x2000};
+	this.u16 = {length: 0x2000 >> 1};
+	this.u32 = {length: 0x2000 >> 2};
 	
 	mdec.install(this);
 	
-	for (var i = 0xf0; i < 0x2000; i++)
+	for (var i = 0; i < 0x2000; i++)
 	{
-		if (i % 4 == 0 && !(i in this.u32))
+		if (i % 4 == 0 && !((i >>> 2) in this.u32))
 		{
-			this.u32.__defineGetter__(i, undef_getter(u32, i, 2));
-			this.u32.__defineSetter__(i, undef_setter(u32, i, 2));
+			this.u32.__defineGetter__(i >>> 2, undef_getter(u32, i, 2));
+			this.u32.__defineSetter__(i >>> 2, undef_setter(u32, i, 2));
 		}
 		
-		if (i % 2 == 0 && !(i in this.u16))
+		if (i % 2 == 0 && !((i >>> 1) in this.u16))
 		{
-			this.u16.__defineGetter__(i, undef_getter(u16, i, 1));
-			this.u16.__defineSetter__(i, undef_setter(u16, i, 1));
+			this.u16.__defineGetter__(i >>> 1, undef_getter(u16, i, 1));
+			this.u16.__defineSetter__(i >>> 1, undef_setter(u16, i, 1));
 		}
 		
 		if (!(i in this.u8))
@@ -109,7 +109,10 @@ HardwareRegisters.unimplementedRegisters = [
 
 HardwareRegisters.prototype.wire = function(address, getter, setter)
 {
+	if (!isFinite(address) || address < 0x1F801000)
+		throw new Error("address is not finite or too small");
+	
 	address -= 0x1F801000;
-	this.u32.__defineGetter__(address >> 2, getter);
-	this.u32.__defineSetter__(address >> 2, setter);
+	this.u32.__defineGetter__(address >>> 2, getter);
+	this.u32.__defineSetter__(address >>> 2, setter);
 }

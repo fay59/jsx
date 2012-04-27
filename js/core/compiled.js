@@ -40,10 +40,14 @@ FunctionCache.prototype.getFunction = function(address)
 	return this.compiled[address];
 }
 
-FunctionCache.prototype.saveFunction = function(address, fn)
+FunctionCache.prototype.saveFunction = function(fn)
 {
 	fn.jitTime = this.callCount;
-	this.compiled[address] = fn;
+	for (var i = 0; i < fn.labels.length; i++)
+	{
+		var label = fn.labels[i];
+		this.compiled[label] = fn;
+	}
 }
 
 FunctionCache.prototype.invalidate = function(address)
@@ -65,7 +69,7 @@ FunctionCache.prototype.invoke = function(cpu, address, context)
 		try
 		{
 			var compiled = this.recompiler.recompileFunction(this.memory, address, context);
-			this.saveFunction(address, compiled);
+			this.saveFunction(compiled);
 		}
 		catch (e)
 		{
@@ -74,7 +78,7 @@ FunctionCache.prototype.invoke = function(cpu, address, context)
 	}
 	
 	this.callCount++;
-	this.compiled[address].code.call(cpu, address, context);
+	return this.compiled[address].code.call(cpu, address, context);
 }
 
 FunctionCache.prototype.executeOne = function(cpu, address, context)
