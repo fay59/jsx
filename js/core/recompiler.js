@@ -652,9 +652,8 @@ Recompiler.formatHex = function(address, length)
 		return load(16, s, i, t, true);
 	});
 	
-	impl("lhu", function() {
-		countUnimplemented.call(this, "lhu");
-		return panic("lhu is not implemented", this.address - 4);
+	impl("lhu", function(s, t, i) {
+		return load(16, s, i, t, false);
 	});
 	
 	impl("lui", function(t, i) {
@@ -803,9 +802,8 @@ Recompiler.formatHex = function(address, length)
 		return binaryOp("<<", d, t, hex(i));
 	});
 	
-	impl("sllv", function() {
-		countUnimplemented.call(this, "sllv");
-		return panic("sllv is not implemented", this.address - 4);
+	impl("sllv", function(s, t, d) {
+		return binaryOp("<<", d, t, gpr(s));
 	});
 	
 	impl("slt", function(s, t, d) {

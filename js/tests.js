@@ -478,6 +478,18 @@ var Tests = {
 			r.complete();
 		},
 		
+		"sllv": function(r)
+		{
+			const shift = 3;
+			var cpu = perform([
+				"addiu t0, r0, " + shift,
+				"sllv at, t7, t0"
+			]);
+			with (Assembler.registerNames)
+				r.assert(cpu.gpr[at] == (initialValue(t7) << shift), "execution didn't have the expected result");
+			r.complete();
+		},
+		
 		"subu": {
 			"positive result": function(r)
 			{
