@@ -79,6 +79,7 @@ Recompiler.prototype.recompileFunction = function(memory, startAddress)
 
 Recompiler.prototype.recompileOpcode = function(currentAddress, op)
 {
+	var injectedBefore = this._injectBefore(currentAddress, op, this.isDelaySlot);
 	var instructionCode = this[op.instruction.name].apply(this, op.params);
 
 	if (instructionCode === undefined)
@@ -88,7 +89,6 @@ Recompiler.prototype.recompileOpcode = function(currentAddress, op)
 	var opcodeString = Disassembler.getOpcodeAsString(op);
 	var commentString = addressString + ": " + opcodeString;
 	var jsComment = "// " + commentString + "\n";
-	var injectedBefore = this._injectBefore(currentAddress, op, this.isDelaySlot);
 	var injectedAfter = this._injectAfter(currentAddress, op, this.isDelaySlot);
 	
 	return injectedBefore + jsComment + instructionCode + injectedAfter;

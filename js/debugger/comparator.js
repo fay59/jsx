@@ -17,7 +17,7 @@ StateComparator.ComparisonError.prototype.toString = function()
 StateComparator.prototype.reset = function(memory)
 {
 	var recompiler = memory.compiled.recompiler;
-	var delaySlot = 0;
+	var isJump = false;
 	
 	function compare(address)
 	{
@@ -27,16 +27,15 @@ StateComparator.prototype.reset = function(memory)
 	recompiler.addInjector({
 		injectBeforeInstruction: function(address, opcode, isDelaySlot)
 		{
-			if (isDelaySlot)
+			if (opcode.instruction.name[0] == 'j')
 			{
-				delaySlot = 2;
-				return;
+				isJump = true;
+				return "try {\n";
 			}
 			
-			if (delaySlot == 2)
+			if (isDelaySlot && isJump)
 			{
-				delaySlot--;
-				return compare(address) + "\ntry {\n";
+				return compare(address - 4) + "\n";
 			}
 			
 			return compare(address) + "\n";
@@ -44,9 +43,9 @@ StateComparator.prototype.reset = function(memory)
 		
 		injectAfterInstruction: function(address, opcode, isDelaySlot)
 		{
-			if (delaySlot == 1)
+			if (!isDelaySlot && isJump)
 			{
-				delaySlot--;
+				isJump = false;
 				return "} finally { " + compare(address + 4) + "}\n";
 			}
 		}
