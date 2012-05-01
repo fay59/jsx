@@ -775,9 +775,9 @@ Recompiler.formatHex = function(address, length)
 		return panic("nct is not implemented", this.address - 4);
 	});
 	
-	impl("nor", function() {
-		countUnimplemented.call(this, "nor");
-		return panic("nor is not implemented", this.address - 4);
+	impl("nor", function(s, t, d) {
+		if (d == 0) return ";\n";
+		return gpr(d) + " = ~(" + gpr(s) + " | " + gpr(t) + ");\n";
 	});
 	
 	impl("or", function(s, t, d) {
