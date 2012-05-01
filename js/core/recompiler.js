@@ -885,7 +885,7 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("syscall", function() {
-		return "return this.raiseException(" + hex(this.address) + ", 0x20, " + this.isDelaySlot + ");\n";
+		return "return this.raiseException(" + hex(this.address - 4) + ", 0x20, " + this.isDelaySlot + ");\n";
 	});
 	
 	impl("xor", function() {

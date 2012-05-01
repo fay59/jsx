@@ -2,6 +2,7 @@ var StateComparator = function(buffer)
 {
 	this.frameIndex = 0;
 	this.buffer = buffer;
+	this.hits = {};
 }
 
 StateComparator.ComparisonError = function(error)
@@ -56,9 +57,17 @@ StateComparator.prototype.compare = function(pc, cpu)
 {
 	try
 	{
+		if (this.hits[pc] === undefined) this.hits[pc] = 0;
+		this.hits[pc]++;
+		
 		var array = new Uint32Array(this.buffer, this.frameIndex * 0x10, 4);
 		if (pc != array[0])
-			throw new StateComparator.ComparisonError("program counter does not match after " + this.frameIndex + " instructions");
+		{
+			var message = "program counter does not match after ";
+			message += this.frameIndex + " instructions ";
+			message += "(after " + this.hits[pc] + " hits)";
+			throw new StateComparator.ComparisonError(message);
+		}
 		
 		var changeIndex = array[2];
 		var changeValue = array[3];
@@ -66,7 +75,8 @@ StateComparator.prototype.compare = function(pc, cpu)
 		{
 			var message = "at " + pc.toString(16) + ": ";
 			message += "register " + changeIndex + " should be " + changeValue.toString(16) + " ";
-			message += "but it's " + cpu.gpr[changeIndex].toString(16);
+			message += "but it's " + cpu.gpr[changeIndex].toString(16) + " ";
+			message += "(after " + this.hits[pc] + " hits)";
 			throw new StateComparator.ComparisonError(message);
 		}
 	}
