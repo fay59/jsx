@@ -79,16 +79,17 @@ Recompiler.prototype.recompileFunction = function(memory, startAddress)
 
 Recompiler.prototype.recompileOpcode = function(currentAddress, op)
 {
-	var injectedBefore = this._injectBefore(currentAddress, op, this.isDelaySlot);
+	var instructionCode = this[op.instruction.name].apply(this, op.params);
+
+	if (instructionCode === undefined)
+		this.panic(commentString + " was recompiled as undefined");
+
 	var addressString = Recompiler.formatHex(currentAddress);
 	var opcodeString = Disassembler.getOpcodeAsString(op);
 	var commentString = addressString + ": " + opcodeString;
 	var jsComment = "// " + commentString + "\n";
-	var instructionCode = this[op.instruction.name].apply(this, op.params);
+	var injectedBefore = this._injectBefore(currentAddress, op, this.isDelaySlot);
 	var injectedAfter = this._injectAfter(currentAddress, op, this.isDelaySlot);
-	
-	if (instructionCode === undefined)
-		this.panic(commentString + " was recompiled as undefined");
 	
 	return injectedBefore + jsComment + instructionCode + injectedAfter;
 }
@@ -277,7 +278,7 @@ Recompiler.prototype._injectBefore = function(address, opcode, isDelaySlot)
 	return this._injectCallback("injectBeforeInstruction", address, opcode, isDelaySlot);
 }
 
-Recompiler.prototype._injectAfter = function(address, opcode, isDelaySlot, isDelaySlot)
+Recompiler.prototype._injectAfter = function(address, opcode, isDelaySlot)
 {
 	return this._injectCallback("injectAfterInstruction", address, opcode, isDelaySlot);
 }
@@ -708,7 +709,7 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("mtc0", function(t, l) {
-		return "this.writeCOP0(" + l + ", " + gpr(t) + ")\n";
+		return "this.writeCOP0(" + l + ", " + gpr(t) + ");\n";
 	});
 	
 	impl("mtc2", function() {

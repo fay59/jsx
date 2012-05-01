@@ -18,6 +18,12 @@ StateComparator.prototype.reset = function(memory)
 {
 	var recompiler = memory.compiled.recompiler;
 	var delaySlot = 0;
+	
+	function compare(address)
+	{
+		return "context.compare(0x" + address.toString(16) + ", this);";
+	}
+	
 	recompiler.addInjector({
 		injectBeforeInstruction: function(address, opcode, isDelaySlot)
 		{
@@ -27,17 +33,21 @@ StateComparator.prototype.reset = function(memory)
 				return;
 			}
 			
-			return "context.compare(" + address + ", this);\n";
+			if (delaySlot == 2)
+			{
+				delaySlot--;
+				return compare(address) + "\ntry {\n";
+			}
+			
+			return compare(address) + "\n";
 		},
 		
 		injectAfterInstruction: function(address, opcode, isDelaySlot)
 		{
-			if (delaySlot == 2)
-				delaySlot--;
-			else if (delaySlot == 1)
+			if (delaySlot == 1)
 			{
 				delaySlot--;
-				return "context.compare(" + address + ", this);\n";
+				return "} finally { " + compare(address + 4) + "}\n";
 			}
 		}
 	});
