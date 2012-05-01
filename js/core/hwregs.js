@@ -34,6 +34,7 @@ DMARegisters.prototype.wire = function(hwregs, address, action)
 
 var HardwareRegisters = function(mdec)
 {
+	var self = this;
 	function getter(buffer, index)
 	{
 		return function() { return buffer[index]; }
@@ -50,7 +51,7 @@ var HardwareRegisters = function(mdec)
 		{
 			var address = 0x1F801000 + index;
 			var strAddress = address.toString(16);
-			if (HardwareRegisters.unimplementedRegisters.indexOf(address) == -1)
+			if (this.notifyUnknowns && HardwareRegisters.unimplementedRegisters.indexOf(address) == -1)
 				console.warn("reading register " + strAddress);
 			return buffer[index >>> shift];
 		};
@@ -62,12 +63,13 @@ var HardwareRegisters = function(mdec)
 		{
 			var address = 0x1F801000 + index;
 			var strAddress = address.toString(16);
-			if (HardwareRegisters.unimplementedRegisters.indexOf(address) == -1)
+			if (this.notifyUnknowns && HardwareRegisters.unimplementedRegisters.indexOf(address) == -1)
 				console.warn("writing register " + strAddress + " -> " + value.toString(16));
 			buffer[index >>> shift] = value;
 		};
 	}
 	
+	this.notifyUnknowns = true;
 	this.backbuffer = new ArrayBuffer(0x2000);
 	
 	var u8 = new Uint8Array(this.backbuffer);
@@ -105,6 +107,9 @@ var HardwareRegisters = function(mdec)
 HardwareRegisters.unimplementedRegisters = [
 	0x1f801000, 0x1f801004, 0x1f801008, 0x1f80100c, 0x1f801010, 0x1f80101c,
 	0x1f802041, 0x1f801018, 0x1f8016c0, 0x1f8016c2,
+	
+	// SPU
+	0x1f801da6, 0x1f801da8, 0x1f801daa, 0x1f801dac, 0x1f801dae
 ];
 
 HardwareRegisters.prototype.wire = function(address, getter, setter)

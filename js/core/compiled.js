@@ -78,7 +78,15 @@ FunctionCache.prototype.invoke = function(cpu, address, context)
 	}
 	
 	this.callCount++;
-	return this.compiled[address].code.call(cpu, address, context);
+	try
+	{
+		return this.compiled[address].code.call(cpu, address, context);
+	}
+	catch (e)
+	{
+		console.log(this.compiled[address].code.toString());
+		throw e;
+	}
 }
 
 FunctionCache.prototype.executeOne = function(cpu, address, context)

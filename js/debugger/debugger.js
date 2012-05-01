@@ -89,7 +89,7 @@ Debugger.prototype.reset = function(pc, memory)
 		this.lastRegWrites[i] = 0;
 	
 	// interpose for recompilation
-	memory.compiled.recompiler.injector = {
+	memory.compiled.recompiler.addInjector({
 		injectBeforeInstruction: function(address, opcode)
 		{
 			var jsCode = "context._pc = " + address + ";\n";
@@ -106,7 +106,7 @@ Debugger.prototype.reset = function(pc, memory)
 			}
 			return jsCode;
 		}
-	};
+	});
 	
 	this._eventCallback("stepped");
 	this._eventCallback("steppedinto");

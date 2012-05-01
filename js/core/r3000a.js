@@ -195,9 +195,33 @@ R3000a.prototype.executeOne = function(address, context)
 	return this.memory.compiled.executeOne(this, address, context);
 }
 
-// ugly linear search
 R3000a.prototype.invalidate = function(address)
 {
 	this.memory.compiled.invalidate(address);
 }
 
+R3000a.runtime = {
+	multiplyUnsigned: function(gpr, a, b)
+	{
+		// HI: gpr[32], LO: gpr[33]
+		var c0 = (a & 0xffff) * (b & 0xffff);
+		var c16a = (a & 0xffff) * (b >>> 16);
+		var c16b = (a >>> 16) * (b & 0xffff);
+		var c32 = (a >>> 16) * (b >>> 16);
+
+		var d16 = (c0 >>> 16) + (c16a & 0xFFFF) + (c16b & 0xffff);
+		var d32 = (d16 >>> 16) + (c16a >>> 16) + (c16b >>> 16) + (c32 & 0xffff);
+		var d48 = (d32 >>> 16) + (c32 >>> 16);
+		
+		gpr[33] = (c0 & 0xFFFF) | ((d16 & 0xFFFF) << 16);
+		gpr[32] = (d32 & 0xFFFF) | ((d48 & 0xFFFF) << 16);
+	},
+	
+	lwl: function(gpr, memory, outputReg, address)
+	{
+		var shift = (address & 3) * 8;
+		var mask = ~(shift - 1);
+		var word = memory.read32(address) << shift;
+		gpr[outputReg] = (gpr[outputReg] & mask) | word;
+	}
+}

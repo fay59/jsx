@@ -35,6 +35,12 @@ Disassembler.getOpcode = function(instruction)
 
 Disassembler.getOpcodeAsString = function(opcode)
 {
+	function unsign(x)
+	{
+		var bit = x & 1;
+		return (x >>> 1) * 2 + bit;
+	}
+	
 	if (opcode == null)
 		return undefined;
 	
@@ -55,11 +61,11 @@ Disassembler.getOpcodeAsString = function(opcode)
 				if (format.indexOf('{i<<2}') != -1)
 				{
 					var jump = (param & 0xFFFF0000) == 0 ? (param << 16) >> 14 : param << 2;
-					format = format.replace('{i<<2}', jump.toString(16));
+					format = format.replace('{i<<2}', unsign(jump).toString(16));
 				}
 				else
 				{
-					format = format.replace('{i}', "0x" + param.toString(16));
+					format = format.replace('{i}', param.toString(16));
 				}
 				break;
 			

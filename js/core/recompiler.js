@@ -11,7 +11,7 @@ var Recompiler = function()
 	this.address = 0;
 	this.isDelaySlot = false; // if the instruction is in a delay slot
 	this.opcodes = {};
-	this.injector = null;
+	this.injectors = [];
 }
 
 Recompiler.prototype.recompileFunction = function(memory, startAddress)
@@ -267,6 +267,11 @@ Recompiler.prototype.recompileOne = function(memory, address)
 	return new Function("context", code);
 }
 
+Recompiler.prototype.addInjector = function(injector)
+{
+	return this.injectors.push(injector);
+}
+
 Recompiler.prototype._injectBefore = function(address, opcode)
 {
 	return this._injectCallback("injectBeforeInstruction", address, opcode);
@@ -284,14 +289,19 @@ Recompiler.prototype._injectAtLabel = function(address)
 
 Recompiler.prototype._injectCallback = function(fn)
 {
+	var injected = "";
 	var args = Array.prototype.slice.call(arguments, 1);
-	if (this.injector != null && this.injector[fn] != null && this.injector[fn].call !== undefined)
+	for (var i = 0; i < this.injectors.length; i++)
 	{
-		var result = this.injector[fn].apply(this.injector, args);
-		if (result !== undefined)
-			return result;
+		var injector = this.injectors[i];
+		if (injector[fn] != undefined && injector[fn].apply != undefined)
+		{
+			var result = injector[fn].apply(injector, args);
+			if (result !== undefined)
+				injected += result;
+		}
 	}
-	return '';
+	return injected;
 }
 
 Recompiler.unsign = function(x)
@@ -614,7 +624,7 @@ Recompiler.formatHex = function(address, length)
 	impl("j", function(i) {
 		var opAddress = this.address - 4;
 		var jumpAddress = Recompiler.unsign((opAddress & 0xF0000000) | (i << 2));
-		return "return " + hex(jumpAddress) + ";\n";
+		return delaySlot.call(this) + "return " + hex(jumpAddress) + ";\n";
 	});
 	
 	impl("jal", function(i) {

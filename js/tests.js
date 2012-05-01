@@ -167,6 +167,7 @@ var Tests = {
 			
 			var mdec = new MotionDecoder();
 			var hardware = new HardwareRegisters(mdec);
+			hardware.notifyUnknowns = false;
 			verify(hardware.u8, "u8");
 			verify(hardware.u16, "u16");
 			verify(hardware.u32, "u32");
@@ -478,6 +479,18 @@ var Tests = {
 			r.complete();
 		},
 		
+		"srlv": function(r)
+		{
+			const shift = 3;
+			var cpu = perform([
+				"addiu t0, r0, " + shift,
+				"srlv at, t7, t0"
+			]);
+			with (Assembler.registerNames)
+				r.assert(cpu.gpr[at] == (initialValue(t7) >>> shift), "execution didn't have the expected result");
+			r.complete();
+		},
+		
 		"sllv": function(r)
 		{
 			const shift = 3;
@@ -625,7 +638,7 @@ var Tests = {
 			r.complete();
 		},
 		
-		"All instructions imlemented": function(r)
+		"All instructions implemented": function(r)
 		{
 			var missingInstructions = [];
 			var instructionCount = 0;
@@ -647,6 +660,18 @@ var Tests = {
 				r.fail(missingInstructions + " is missing");
 			else
 				r.fail(missingInstructions.join(", ") + " are missing");
+		}
+	},
+	
+	"Runtime functions": {
+		"multiplyUnsigned": function(r)
+		{
+			var number = 33554432;
+			var gpr = new Uint32Array(34);
+			R3000a.runtime.multiplyUnsigned(gpr, number, number);
+			r.assert(gpr[33] == 0, "multiplication should leave lo = 0");
+			r.assert(gpr[32] == (1 << 18), "multiplication should leave hi = 2^20");
+			r.complete();
 		}
 	}
 };

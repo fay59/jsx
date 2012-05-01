@@ -25,6 +25,7 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 			}
 			catch (e)
 			{
+				console.error(e);
 				document.querySelector("#crash").textContent = e.toString();
 				
 				var totalJitted = 0;
