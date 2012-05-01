@@ -79,14 +79,14 @@ Recompiler.prototype.recompileFunction = function(memory, startAddress)
 
 Recompiler.prototype.recompileOpcode = function(currentAddress, op)
 {
-	var injectedBefore = this._injectBefore(currentAddress, op);
-	var injectedAfter = this._injectAfter(currentAddress, op);
-	
+	var injectedBefore = this._injectBefore(currentAddress, op, this.isDelaySlot);
 	var addressString = Recompiler.formatHex(currentAddress);
 	var opcodeString = Disassembler.getOpcodeAsString(op);
 	var commentString = addressString + ": " + opcodeString;
 	var jsComment = "// " + commentString + "\n";
 	var instructionCode = this[op.instruction.name].apply(this, op.params);
+	var injectedAfter = this._injectAfter(currentAddress, op, this.isDelaySlot);
+	
 	if (instructionCode === undefined)
 		this.panic(commentString + " was recompiled as undefined");
 	
@@ -272,14 +272,14 @@ Recompiler.prototype.addInjector = function(injector)
 	return this.injectors.push(injector);
 }
 
-Recompiler.prototype._injectBefore = function(address, opcode)
+Recompiler.prototype._injectBefore = function(address, opcode, isDelaySlot)
 {
-	return this._injectCallback("injectBeforeInstruction", address, opcode);
+	return this._injectCallback("injectBeforeInstruction", address, opcode, isDelaySlot);
 }
 
-Recompiler.prototype._injectAfter = function(address, opcode)
+Recompiler.prototype._injectAfter = function(address, opcode, isDelaySlot, isDelaySlot)
 {
-	return this._injectCallback("injectAfterInstruction", address, opcode);
+	return this._injectCallback("injectAfterInstruction", address, opcode, isDelaySlot);
 }
 
 Recompiler.prototype._injectAtLabel = function(address)
@@ -439,20 +439,21 @@ Recompiler.formatHex = function(address, length)
 	
 	function delaySlot()
 	{
-		this.delaySlot = true;
+		this.isDelaySlot = true;
 		try
 		{
+			var delaySlotAddress = this.address;
 			var delaySlot = this.nextInstruction();
 			if (delaySlot.instruction.name[0] == 'b' || delaySlot.instruction.name[0] == 'j')
 				return "this.panic('branch in delay slot is undefined behavior', " + (this.address - 4) + ");\n";
 			
-			var jsCode = "// delay slot: " + Disassembler.getOpcodeAsString(delaySlot) + "\n";
-			jsCode += this[delaySlot.instruction.name].apply(this, delaySlot.params);
+			var jsCode = "// delay slot:\n";
+			jsCode += this.recompileOpcode(delaySlotAddress, delaySlot);
 			return jsCode;
 		}
 		finally
 		{
-			this.delaySlot = false;
+			this.isDelaySlot = false;
 		}
 	}
 	

@@ -90,8 +90,10 @@ Debugger.prototype.reset = function(pc, memory)
 	
 	// interpose for recompilation
 	memory.compiled.recompiler.addInjector({
-		injectBeforeInstruction: function(address, opcode)
+		injectBeforeInstruction: function(address, opcode, isDelaySlot)
 		{
+			if (isDelaySlot) return;
+			
 			var jsCode = "context._pc = " + address + ";\n";
 			if (self.breakpoints.hasEnabledBreakpoint(address))
 				jsCode += "context.breakpoints.hit(" + address + ");\n";
