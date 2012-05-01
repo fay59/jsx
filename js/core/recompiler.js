@@ -495,7 +495,7 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("andi", function(s, t, i) {
-		return binaryOp("&", t, s, signExt(i, 16));
+		return binaryOp("&", t, s, hex(i));
 	});
 	
 	impl("avsz3", function() {
@@ -810,7 +810,7 @@ Recompiler.formatHex = function(address, length)
 		return store(16, s, i, t);
 	});
 	
-	impl("sll", function(t, d, i) { // why does it have an 's' register?
+	impl("sll", function(t, d, i) {
 		return binaryOp("<<", d, t, hex(i));
 	});
 	
@@ -894,6 +894,7 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("xori", function() {
+		// the immediate is NOT sign extended
 		countUnimplemented.call(this, "xori");
 		return panic("xori is not implemented", this.address - 4);
 	});
