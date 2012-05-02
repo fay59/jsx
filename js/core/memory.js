@@ -71,42 +71,6 @@ var MemoryMap = function(hardware, parallelPort, bios)
 	for (var i = 0x1FC80; i < 0x20000; i++) this.pageMap[i] = MemoryMap.unmapped;
 }
 
-MemoryMap.unmapped = {
-	name: "Unmapped memory",
-	buffer: new ArrayBuffer(0),
-	u8Array: new Uint8Array(this.buffer),
-	u16Array: new Uint16Array(this.buffer),
-	u32Array: new Uint32Array(this.buffer),
-	
-	warningMessage: function(getter)
-	{
-		// dark magic!
-		var address = getter.caller.arguments[0];
-		if (isFinite(address))
-		{
-			// we know about 0xfffe0130, thank you
-			if (address != 0xfffe0130)
-				console.warn("accessing unmapped memory at address " + address.toString(16));
-		}
-		else
-			console.warn("accessing unmapped memory--set a breakpoint in memory.js to debug");
-	},
-	
-	get offset() { return 0; },
-	get u8() {
-		this.warningMessage(this.__lookupGetter__("u8"));
-		return this.u8Array;
-	},
-	get u16() {
-		this.warningMessage(this.__lookupGetter__("u16"));
-		return this.u16Array;
-	},
-	get u32() {
-		this.warningMessage(this.__lookupGetter__("u32"));
-		return this.u32Array;
-	}
-};
-
 MemoryMap.prototype.reset = function()
 {
 	this.compiled = new FunctionCache(this);
@@ -203,4 +167,40 @@ MemoryMap.prototype.write8 = function(address, value)
 		MemoryMap.offsets[key] = offset;
 		offset += MemoryMap.regions[key];
 	}
+
+	var unmappedBuffer = new ArrayBuffer(0);
+	MemoryMap.unmapped = {
+		name: "Unmapped memory",
+		u8Array: new Uint8Array(unmappedBuffer),
+		u16Array: new Uint16Array(unmappedBuffer),
+		u32Array: new Uint32Array(unmappedBuffer),
+		
+		warningMessage: function(getter)
+		{
+			// dark magic!
+			var address = getter.caller.arguments[0];
+			if (isFinite(address))
+			{
+				// we know about 0xfffe0130, thank you
+				if (address != 0xfffe0130)
+					console.warn("accessing unmapped memory at address " + address.toString(16));
+			}
+			else
+				console.warn("accessing unmapped memory--set a breakpoint in memory.js to debug");
+		},
+		
+		get offset() { return 0; },
+		get u8() {
+			this.warningMessage(this.__lookupGetter__("u8"));
+			return this.u8Array;
+		},
+		get u16() {
+			this.warningMessage(this.__lookupGetter__("u16"));
+			return this.u16Array;
+		},
+		get u32() {
+			this.warningMessage(this.__lookupGetter__("u32"));
+			return this.u32Array;
+		}
+	};
 })();

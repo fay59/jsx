@@ -1,6 +1,7 @@
 var StateComparator = function(buffer)
 {
-	this.frameIndex = 0;
+	this.instructions = 0;
+	this.arrayStart = 0;
 	this.buffer = buffer;
 	this.hits = {};
 }
@@ -55,33 +56,59 @@ StateComparator.prototype.reset = function(memory)
 
 StateComparator.prototype.compare = function(pc, cpu)
 {
-	try
+	// pc, changes, gprValue, cop0Values[4]
+	if (this.hits[pc] === undefined) this.hits[pc] = 0;
+	this.hits[pc]++;
+	
+	var array = new Uint32Array(this.buffer, this.arrayStart, 7);
+	
+	var pcsxPC = array[0];
+	var changedGPR = array[1] & 0x1f;
+	var gprValue = array[2];
+	var changedCOP0 = {};
+	
+	var j = 0;
+	var cop0 = array[1] >>> 9;
+	for (var i = 0; cop0 != 0; i++)
 	{
-		if (this.hits[pc] === undefined) this.hits[pc] = 0;
-		this.hits[pc]++;
-		
-		var array = new Uint32Array(this.buffer, this.frameIndex * 0x10, 4);
-		if (pc != array[0])
+		if (cop0 & 1)
 		{
-			var message = "program counter does not match after ";
-			message += this.frameIndex + " instructions ";
-			message += "(after " + this.hits[pc] + " hits)";
-			throw new StateComparator.ComparisonError(message);
+			changedCOP0[i] = array[3 + j];
+			j++;
 		}
-		
-		var changeIndex = array[2];
-		var changeValue = array[3];
-		if (cpu.gpr[changeIndex] != changeValue)
-		{
-			var message = "at " + pc.toString(16) + ": ";
-			message += "register " + changeIndex + " should be " + changeValue.toString(16) + " ";
-			message += "but it's " + cpu.gpr[changeIndex].toString(16) + " ";
-			message += "(after " + this.hits[pc] + " hits)";
-			throw new StateComparator.ComparisonError(message);
-		}
+		cop0 >>>= 1;
 	}
-	finally
+	
+	this.arrayStart += (3 + j) * 4;
+	this.instructions++;
+	
+	if (pc != pcsxPC)
 	{
-		this.frameIndex++;
+		var message = "program counter does not match after ";
+		message += this.instructions + " instructions ";
+		message += "(after " + this.hits[pc] + " hits)";
+		throw new StateComparator.ComparisonError(message);
+	}
+	
+	if (cpu.gpr[changedGPR] != gprValue)
+	{
+		var message = "at " + pc.toString(16) + " after " + this.instructions + " instructions: ";
+		message += "GRP " + changedGPR + " should be " + gprValue.toString(16) + " ";
+		message += "but it's " + cpu.gpr[changedGPR].toString(16) + " ";
+		message += "(after " + this.hits[pc] + " hits)";
+		throw new StateComparator.ComparisonError(message);
+	}
+	
+	for (var key in changedCOP0)
+	{
+		if (cpu.cop0_reg[key] != changedCOP0[key])
+		{
+			var changeValue = changedCOP0[key];
+			var message = "at " + pc.toString(16) + " after " + this.instructions + " instructions: ";
+			message += "COP0 register " + key + " should be " + changeValue.toString(16) + " ";
+			message += "but it's " + cpu.cop0_reg[key].toString(16) + " ";
+			message += "(after " + this.hits[pc] + " hits)";
+			throw new StateComparator.ComparisonError(message);
+		}
 	}
 }

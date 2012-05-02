@@ -117,8 +117,8 @@ R3000a.prototype.reset = function(memory)
 	this.gpr[33] = 0;
 	
 	// values taken from pSX's debugger at reset
-	this.cop0_reg[12] = 0x00400002;
-	this.cop0_reg[15] = 0x00000230;
+	this.cop0_reg[12] = 0x10900000;
+	this.cop0_reg[15] = 0x00000002;
 }
 
 R3000a.prototype.raiseException = function(epc, exception, inDelaySlot)
@@ -201,7 +201,7 @@ R3000a.prototype.invalidate = function(address)
 }
 
 R3000a.runtime = {
-	multiplyUnsigned: function(gpr, a, b)
+	multu: function(gpr, a, b)
 	{
 		// HI: gpr[32], LO: gpr[33]
 		var c0 = (a & 0xffff) * (b & 0xffff);

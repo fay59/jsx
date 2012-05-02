@@ -664,11 +664,11 @@ var Tests = {
 	},
 	
 	"Runtime functions": {
-		"multiplyUnsigned": function(r)
+		"multu": function(r)
 		{
 			var number = 33554432;
 			var gpr = new Uint32Array(34);
-			R3000a.runtime.multiplyUnsigned(gpr, number, number);
+			R3000a.runtime.multu(gpr, number, number);
 			r.assert(gpr[33] == 0, "multiplication should leave lo = 0");
 			r.assert(gpr[32] == (1 << 18), "multiplication should leave hi = 2^20");
 			r.complete();

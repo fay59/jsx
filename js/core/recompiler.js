@@ -730,9 +730,8 @@ Recompiler.formatHex = function(address, length)
 		return panic("mult is not implemented", this.address - 4);
 	});
 	
-	impl("multu", function() {
-		countUnimplemented.call(this, "multu");
-		return panic("multu is not implemented", this.address - 4);
+	impl("multu", function(s, t) {
+		return "R3000a.runtime.multu(this.gpr, " + gpr(t) + ", " + gpr(s) + ");\n";
 	});
 	
 	impl("mvmva", function() {
@@ -789,7 +788,7 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("rfe", function() {
-		return "this.writeCOP0(12, (this.cop0_reg[12] & 0xfffffff0) | (this.cop0_reg[12] >>> 2));\n";
+		return "this.writeCOP0(12, (this.cop0_reg[12] & 0xfffffff0) | ((this.cop0_reg[12] & 0x3c) >>> 2));\n";
 	});
 	
 	impl("rtps", function() {
@@ -851,9 +850,8 @@ Recompiler.formatHex = function(address, length)
 		return binaryOp(">>>", d, t, i);
 	});
 	
-	impl("srlv", function() {
-		countUnimplemented.call(this, "srlv");
-		return panic("srlv is not implemented", this.address - 4);
+	impl("srlv", function(s, t, d) {
+		return binaryOp(">>>", d, t, gpr(s));
 	});
 	
 	impl("sub", function() {

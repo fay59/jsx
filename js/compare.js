@@ -37,19 +37,13 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 			}
 		}
 		
-		function loadFiles()
+		function loadFiles(reader)
 		{
-			if (bios.files.length == 0 || dump.files.length == 0)
-				return;
-			
-			biosReader.onload = run;
-			biosReader.readAsArrayBuffer(bios.files[0]);
-			
-			dumpReader.onload = run;
-			dumpReader.readAsArrayBuffer(dump.files[0]);
+			reader.addEventListener("load", run);
+			reader.readAsArrayBuffer(this.files[0]);
 		}
 		
-		bios.addEventListener("change", loadFiles);
-		dump.addEventListener("change", loadFiles);
+		bios.addEventListener("change", loadFiles.bind(bios, biosReader));
+		dump.addEventListener("change", loadFiles.bind(dump, dumpReader));
 	})
 );
