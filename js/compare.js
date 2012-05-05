@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", including.bind(null,
 	"js/core/disasm.js", "js/core/r3000a.js", "js/core/compiled.js", "js/core/hwregs.js",
 	"js/core/parallel.js", "js/core/memory.js", "js/core/recompiler.js", "js/core/asm.js",
-	"js/core/mdec.js", "js/debugger/comparator.js", function()
+	"js/core/mdec.js", "js/core/gpu.js", "js/debugger/comparator.js", "js/core/psx.js", function()
 	{
 		var bios = document.querySelector("#bios");
 		var dump = document.querySelector("#dump");
@@ -15,21 +15,14 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 			if (waitCount != 0)
 				return;
 			
-			var bios = new GeneralPurposeBuffer(biosReader.result);
-			var mdec = new MotionDecoder();
-			var hardwareRegisters = new HardwareRegisters(mdec);
-			var parallelPort = new ParallelPortMemoryRange();
-			var memory = new MemoryMap(hardwareRegisters, parallelPort, bios);
+			var psx = new PSX(console, null, biosReader.result, [], []);
 			var comparator = new StateComparator(dumpReader.result);
-			
-			var psx = new R3000a();
-			psx.reset(memory);
-			mdec.reset(memory);
-			comparator.reset(memory);
+			psx.reset();
+			comparator.reset(psx.memory);
 			
 			try
 			{
-				psx.run(R3000a.bootAddress, comparator);
+				psx.cpu.run(R3000a.bootAddress, comparator);
 			}
 			catch (e)
 			{

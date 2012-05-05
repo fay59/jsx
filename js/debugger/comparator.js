@@ -60,7 +60,10 @@ StateComparator.prototype.compare = function(pc, cpu)
 	if (this.hits[pc] === undefined) this.hits[pc] = 0;
 	this.hits[pc]++;
 	
-	var array = new Uint32Array(this.buffer, this.arrayStart, 7);
+	var maxSize = (this.buffer.byteLength - this.arrayStart) >>> 2;
+	if (maxSize == 0)
+		throw new Error("passed through all recorded state");
+	var array = new Uint32Array(this.buffer, this.arrayStart, Math.min(maxSize, 7));
 	
 	var pcsxPC = array[0];
 	var changedGPR = array[1] & 0x1f;

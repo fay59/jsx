@@ -1,22 +1,22 @@
 document.addEventListener("DOMContentLoaded", including.bind(null,
 	"js/core/disasm.js", "js/core/r3000a.js", "js/core/compiled.js", "js/core/hwregs.js",
 	"js/core/parallel.js", "js/core/memory.js", "js/core/recompiler.js", "js/core/asm.js",
-	"js/core/mdec.js", function()
+	"js/core/mdec.js", "js/core/gpu.js", function()
 	{
 	document.querySelector("#bios").addEventListener("change", function()
 	{
 		var reader = new FileReader();
 		reader.onload = function()
 		{
+			var psx = new R3000a();
 			var bios = new GeneralPurposeBuffer(reader.result);
 			var mdec = new MotionDecoder();
-			var hardwareRegisters = new HardwareRegisters(mdec);
+			var gpu = new GPU(null);
+			var hardwareRegisters = new HardwareRegisters(mdec, gpu);
 			var parallelPort = new ParallelPortMemoryRange();
 			var memory = new MemoryMap(hardwareRegisters, parallelPort, bios);
 			
 			mdec.memory = memory;
-			
-			var psx = new R3000a();
 			psx.reset(memory);
 			
 			try

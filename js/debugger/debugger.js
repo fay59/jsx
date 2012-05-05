@@ -1,10 +1,10 @@
-var Debugger = function(cpu)
+var Debugger = function(psx)
 {
 	var self = this;
 	
 	this.stack = [];
-	this.cpu = cpu;
-	this.diag = console;
+	this.cpu = psx.cpu;
+	this.diag = psx.diags;
 	this.breakpoints = new BreakpointList(cpu);
 	this._lastHitBreakpoint = null;
 	

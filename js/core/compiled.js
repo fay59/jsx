@@ -84,7 +84,6 @@ FunctionCache.prototype.invoke = function(cpu, address, context)
 	}
 	catch (e)
 	{
-		console.log(this.compiled[address].code.toString());
 		throw e;
 	}
 }

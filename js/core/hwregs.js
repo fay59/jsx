@@ -32,8 +32,41 @@ DMARegisters.prototype.wire = function(hwregs, address, action)
 	);
 }
 
-var HardwareRegisters = function(mdec)
+var Counter = function()
 {
+	this.count = 0;
+	this.target = 0;
+	this.mode = 0;
+	
+	this.startCycle = 0;
+	this.cycle = 0;
+	this.rate = 0;
+	this.interrupt = 0;
+}
+
+Counter.prototype.wire = function(hwregs, address)
+{
+	var self = this;
+	hwregs.wire(address,
+		function() { return this.count; },
+		function(value) {  }
+	);
+	
+	hwregs.wire(address + 4,
+		function() { return this.mode; },
+		function(value) {  }
+	);
+	
+	hwregs.wire(address + 4,
+		function() { return this.target; },
+		function(value) {  }
+	);
+}
+
+var HardwareRegisters = function(psx)
+{
+	this.psx = psx;
+	
 	var self = this;
 	function getter(buffer, index)
 	{
@@ -52,7 +85,7 @@ var HardwareRegisters = function(mdec)
 			var address = 0x1F801000 + index;
 			var strAddress = address.toString(16);
 			if (this.notifyUnknowns && HardwareRegisters.unimplementedRegisters.indexOf(address) == -1)
-				console.warn("reading register " + strAddress);
+				self.psx.diags.warn("reading register " + strAddress);
 			return buffer[index >>> shift];
 		};
 	}
@@ -64,7 +97,7 @@ var HardwareRegisters = function(mdec)
 			var address = 0x1F801000 + index;
 			var strAddress = address.toString(16);
 			if (this.notifyUnknowns && HardwareRegisters.unimplementedRegisters.indexOf(address) == -1)
-				console.warn("writing register " + strAddress + " -> " + value.toString(16));
+				self.psx.diags.warn("writing register " + strAddress + " -> " + value.toString(16));
 			buffer[index >>> shift] = value;
 		};
 	}
@@ -80,7 +113,8 @@ var HardwareRegisters = function(mdec)
 	this.u16 = {length: 0x2000 >> 1};
 	this.u32 = {length: 0x2000 >> 2};
 	
-	mdec.install(this);
+	for (var i = 1; i < arguments.length; i++)
+		arguments[i].install(this);
 	
 	for (var i = 0; i < 0x2000; i++)
 	{
@@ -120,4 +154,9 @@ HardwareRegisters.prototype.wire = function(address, getter, setter)
 	address -= 0x1F801000;
 	this.u32.__defineGetter__(address >>> 2, getter);
 	this.u32.__defineSetter__(address >>> 2, setter);
+	
+	this.u16.__defineGetter__(address >>> 1, function() { return getter() & 0xffff; });
+	this.u16.__defineGetter__((address >>> 1) + 1, function() { return getter() >>> 16; });
+	this.u16.__defineSetter__(address >>> 1, function(value) { setter((getter() & 0xffff0000) | value); });
+	this.u16.__defineSetter__((address >>> 1) + 1, function(value) { setter((getter() & 0xffff) | (value << 16)); });
 }

@@ -1,14 +1,14 @@
-var MotionDecoder = function()
+var MotionDecoder = function(psx)
 {
 	var quantizeTable = new ArrayBuffer(0x80 * 4);
+	
+	this.psx = psx;
 	
 	this.iqY = new Int32Array(quantizeTable, 0, 0x40);
 	this.iqUV = new Int32Array(quantizeTable, 0x40, 0x40);
 	
-	this.memory = null;
 	this.dma0 = new DMARegisters();
 	this.dma1 = new DMARegisters();
-	this.diags = window.console;
 	
 	this.command = 0;
 	this.runLengthDataAddress = 0;
@@ -38,9 +38,8 @@ MotionDecoder.zigZagScan = [
 	53,60,61,54,47,55,62,63
 ];
 
-MotionDecoder.prototype.reset = function(memory)
+MotionDecoder.prototype.reset = function()
 {
-	this.memory = memory;
 	for (var i = 0; i < 0x40; i++)
 	{
 		this.iqY[i] = 0;
@@ -88,7 +87,7 @@ MotionDecoder.prototype.execDMA0 = function()
 	}
 	else
 	{
-		this.diags.warn("Unknown command " + this.command.toString(16));
+		this.psx.diags.warn("Unknown command " + this.command.toString(16));
 	}
 }
 
@@ -97,10 +96,10 @@ MotionDecoder.prototype.execDMA1 = function()
 	if (this.dma1.chcr != 0x01000200)
 		return;
 	
-	console.log("Doing DMA1");
+	var memory = this.psx.memory;
 	
 	var dataSize = this.dma1.getSize();
-	this.memory.compiled.invalidateRange(this.dma1.madr, dataSize);
+	memory.compiled.invalidateRange(this.dma1.madr, dataSize);
 	
 	var writeAddress = this.dma1.madr;
 	const is24Bits = (this.command & 0x08000000) == 0;
@@ -126,6 +125,7 @@ MotionDecoder.prototype.execDMA1 = function()
 
 MotionDecoder.prototype.runLengthToBlock = function(block, runLengthOffset)
 {
+	var memory = this.psx.memory;
 	for (var i = 0; i < block.length; i++)
 		block[i] = 0;
 	
@@ -133,7 +133,7 @@ MotionDecoder.prototype.runLengthToBlock = function(block, runLengthOffset)
 	for (var i = 0; i < 6; i++)
 	{
 		var table = i < 2 ? this.iqUV : this.iqY;
-		var rlCode = this.memory.read16(runLengthOffset);
+		var rlCode = memory.read16(runLengthOffset);
 		runLengthOffset += 2;
 		
 		var scale = rlCode >> 10;
@@ -142,7 +142,7 @@ MotionDecoder.prototype.runLengthToBlock = function(block, runLengthOffset)
 		var zigZagIndex = 0;
 		while (true)
 		{
-			rlCode = this.memory.read16(runLengthOffset);
+			rlCode = memory.read16(runLengthOffset);
 			runLengthOffset += 2;
 			if (rlCode == 0xfe00)
 				break;
@@ -163,6 +163,7 @@ MotionDecoder.prototype.runLengthToBlock = function(block, runLengthOffset)
 MotionDecoder.prototype.yuv2rgb16 = function(block, outputAddress)
 {
 	var index = 0;
+	var memory = this.psx.memory;
 	for (var y = 0; y < 7; y++)
 	for (var x = 0; x < 7; x++)
 	{
@@ -176,13 +177,14 @@ MotionDecoder.prototype.yuv2rgb16 = function(block, outputAddress)
 		var b = Math.max(0, Math.min(255, y + 1.772 * cb));
 		
 		var output = ((r >>> 3) << 10) | ((g >>> 3) << 5) | (b >>> 3);
-		this.memory.write16(outputAddress, output);
+		memory.write16(outputAddress, output);
 		output += 2;
 	}
 }
 
 MotionDecoder.prototype.yuv2rgb24 = function(block, outputAddress)
 {
+	var memory = this.psx.memory;
 	var index = 0;
 	for (var y = 0; y < 7; y++)
 	for (var x = 0; x < 7; x++)
@@ -196,17 +198,18 @@ MotionDecoder.prototype.yuv2rgb24 = function(block, outputAddress)
 		var g = Math.max(0, Math.min(255, y - 0.3437 * cb - 0.7143 * cr));
 		var b = Math.max(0, Math.min(255, y + 1.772 * cb));
 		
-		this.memory.write8(outputAddress, r);
-		this.memory.write8(outputAddress + 1, g);
-		this.memory.write8(outputAddress + 2, b);
+		memory.write8(outputAddress, r);
+		memory.write8(outputAddress + 1, g);
+		memory.write8(outputAddress + 2, b);
 		outputAddress += 3;
 	}
 }
 
 MotionDecoder.prototype.initQuantizeTable = function(table, address)
 {
+	var memory = this.psx.memory;
 	for (var i = 0; i < 0x40; i++)
-		table[i] = (this.memory.read8(address + i) * MotionDecoder.aanScale[i]) >>> 12;
+		table[i] = (memory.read8(address + i) * MotionDecoder.aanScale[i]) >>> 12;
 }
 
 MotionDecoder.inverseDiscreteCosineTransform = function(input, output, outputOffset)

@@ -86,10 +86,7 @@ var TestResult = function(element)
 	}
 }
 
-var bios = new GeneralPurposeBuffer(0x80000);
-var mdec = new MotionDecoder();
-var hardwareRegisters = new HardwareRegisters(mdec);
-var parallelPort = new ParallelPortMemoryRange();
+var psx = new PSX(console, null, new ArrayBuffer(0x80000), [], []);
 
 function initialValue(register)
 {
@@ -98,9 +95,8 @@ function initialValue(register)
 
 function testCPU()
 {
-	var cpu = new R3000a();
-	var memory = new MemoryMap(hardwareRegisters, parallelPort, bios);
-	cpu.reset(memory);
+	psx.reset();
+	var cpu = psx.cpu;
 	
 	for (var i = 0; i < cpu.gpr.length; i++)
 		cpu.gpr[i] = initialValue(i);
@@ -114,6 +110,7 @@ function writeInstructions(memory, instructions)
 {
 	const startAddress = 0x500;
 	instructions.push("jr ra");
+	instructions.push("sll 0, 0, 0");
 	var compiled = Assembler.assemble(instructions);
 	for (var i = 0; i < compiled.length; i++)
 		memory.write32(startAddress + i * 4, compiled[i]);
@@ -171,22 +168,6 @@ var Tests = {
 			verify(hardware.u8, "u8");
 			verify(hardware.u16, "u16");
 			verify(hardware.u32, "u32");
-			r.complete();
-		},
-		
-		"Read-write ping-pong in RAM area": function(r)
-		{
-			var bios = new GeneralPurposeBuffer(0x80000);
-			var mdec = new MotionDecoder();
-			var hardwareRegisters = new HardwareRegisters(mdec);
-			var parallelPort = new ParallelPortMemoryRange();
-			var memory = new MemoryMap(hardwareRegisters, parallelPort, bios);
-			
-			memory.write32(4, 0xdeadbeef);
-			r.assert(memory.read8(4) == 0xef);
-			r.assert(memory.read8(5) == 0xbe);
-			r.assert(memory.read8(6) == 0xad);
-			r.assert(memory.read8(7) == 0xde);
 			r.complete();
 		}
 	},

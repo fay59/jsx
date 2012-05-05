@@ -12,13 +12,12 @@ ExecutionException.prototype.toString = function()
 	return this.message;
 }
 
-var R3000a = function()
+var R3000a = function(psx)
 {
+	this.psx = psx;
 	this.stopped = false;
 	this.memory = null;
 	this.ticks = 0;
-	
-	this.diags = console;
 	
 	// GPRs, COP0 registers, COP2 data registers, COP2 control registers
 	this.registerMemory = new ArrayBuffer((34 * 4) + (16 * 4) + (32 * 4) + (32 * 4));
@@ -70,13 +69,6 @@ R3000a.srFlags = {
 	CU: 0xF0000000
 };
 
-R3000a.prototype.setDiagnosticsOutput = function(diags)
-{
-	this.diags = diags;
-	if (this.memory != null)
-		this.memory.diags = diags;
-}
-
 R3000a.prototype.panic = function(message, pc)
 {
 	this.stopped = true;
@@ -86,7 +78,7 @@ R3000a.prototype.panic = function(message, pc)
 // to use from the WebKit debugger when something goes terribly wrong
 R3000a.prototype.__crash = function()
 {
-	this.diags.error("crashing the PSX engine");
+	this.psx.diags.error("crashing the PSX engine");
 	// this should do it
 	this.gpr = null;
 	this.fgr = null;
@@ -99,11 +91,9 @@ R3000a.prototype.stop = function()
 	this.stopped = true;
 }
 
-R3000a.prototype.reset = function(memory)
+R3000a.prototype.reset = function()
 {
-	this.memory = memory;
-	this.memory.diags = this.diags;
-	this.memory.reset();
+	this.memory = this.psx.memory;
 	
 	for (var i = 0; i < 32; i++)
 	{
@@ -119,6 +109,16 @@ R3000a.prototype.reset = function(memory)
 	// values taken from pSX's debugger at reset
 	this.cop0_reg[12] = 0x10900000;
 	this.cop0_reg[15] = 0x00000002;
+}
+
+R3000a.prototype.checkInterrupts = function(epc)
+{
+	if (this.memory.read32(0x1f801070) & this.memory.read32(0x1f801074))
+		if ((this.cop0_reg[12] & 0x401) == 0x401)
+		{
+			throw new Error("raised interrupt!");
+			return this.raiseException(epc, 0x400, false);
+		}
 }
 
 R3000a.prototype.raiseException = function(epc, exception, inDelaySlot)
@@ -145,7 +145,7 @@ R3000a.prototype.writeCOP0 = function(reg, value)
 	var oldValue = this.cop0_reg[reg];
 	this.cop0_reg[reg] = value;
 	
-	this.diags.log("Writing " + value.toString(16) + " to " + Disassembler.cop0RegisterNames[reg]);
+	this.psx.diags.log("Writing " + value.toString(16) + " to " + Disassembler.cop0RegisterNames[reg]);
 	
 	switch (reg)
 	{
@@ -167,7 +167,7 @@ R3000a.prototype.clock = function(ticks)
 	this.ticks += ticks;
 	if (this.ticks >= 10000000)
 	{
-		this.diags.log("10000000 ticks");
+		this.psx.diags.log("10000000 ticks");
 		this.ticks = 0;
 	}
 }

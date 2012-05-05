@@ -2,7 +2,6 @@ var Recompiler = function()
 {
 	this.memory = null;
 	this.code = {};
-	this.diags = console;
 	
 	this.startAddress = null;
 	this.compiledAddresses = [];
@@ -180,12 +179,10 @@ Recompiler.functionPrelude = "var overflowChecked = 0;\n";
 
 Recompiler.prototype.compile = function()
 {
-	// the conditional allows to resume a function at a certain label
-	var startAddress = "0x" + Recompiler.formatHex(this.startAddress);
-	var jsCode = "pc = isFinite(pc) ? pc : " + startAddress + ";\n";
-	jsCode += "this.currentFunction = " + startAddress + ";\n"
-	jsCode += Recompiler.functionPrelude;
+	var jsCode = Recompiler.functionPrelude;
 	jsCode += "while (true) {\n";
+	jsCode += "var interruptPC = this.checkInterrupts(pc);\n";
+	jsCode += "if (interruptPC !== undefined) return interruptPC;\n";
 	jsCode += "switch (pc) {\n";
 	
 	// keys need to be sorted to be consistent

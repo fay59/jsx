@@ -1,4 +1,4 @@
-var ParallelPortMemoryRange = function()
+var ParallelPortMemoryRange = function(psx)
 {
 	this.u8 = {};
 	this.u16 = {};
@@ -32,7 +32,7 @@ var ParallelPortMemoryRange = function()
 	{
 		return function()
 		{
-			console.warn("writing to parallel port range at " + addr.toString(16));
+			psx.diags.warn("writing to parallel port range at " + addr.toString(16));
 		}
 	}
 	

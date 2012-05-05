@@ -26,12 +26,12 @@ MemoryCache.prototype.write8 = MemoryCache.returnZero;
 MemoryCache.prototype.write16 = MemoryCache.returnZero;
 MemoryCache.prototype.write32 = MemoryCache.returnZero;
 
-var MemoryMap = function(hardware, parallelPort, bios)
+var MemoryMap = function(psx, hardware, parallelPort, bios)
 {
 	if (hardware == undefined || parallelPort == undefined || bios == undefined)
 		throw new Error("undefined parameters are not allowed");
 	
-	this.diags = console;
+	this.psx = psx;
 	this.compiled = null;
 	
 	this.ram = new GeneralPurposeBuffer(0x200000);
