@@ -9,7 +9,16 @@ var PSX = function(diags, webgl, bios, controller1StateArray, controller2StateAr
 	this.gpu = new GPU(this, webgl);
 	this.hardwareRegisters = new HardwareRegisters(this, this.mdec, this.gpu);
 	this.memory = new MemoryMap(this, this.hardwareRegisters, this.parallelPort, this.bios);
+	
+	this.framesPerSecond = 50;
 }
+
+PSX.noDiags = {
+	debug: function() {},
+	log: function() {},
+	warn: function() {},
+	error: function() {}
+};
 
 PSX.prototype.reset = function()
 {
@@ -20,7 +29,7 @@ PSX.prototype.reset = function()
 	this.memory.reset();
 }
 
-PSX.prototype.runFrame = function()
+PSX.prototype.runFrame = function(context)
 {
-	
+	this.pc = this.cpu.run(this.pc, context);
 }

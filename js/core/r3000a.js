@@ -15,9 +15,9 @@ ExecutionException.prototype.toString = function()
 var R3000a = function(psx)
 {
 	this.psx = psx;
-	this.stopped = false;
+	this.shouldYield = false;
 	this.memory = null;
-	this.ticks = 0;
+	this.cycles = 0;
 	
 	// GPRs, COP0 registers, COP2 data registers, COP2 control registers
 	this.registerMemory = new ArrayBuffer((34 * 4) + (16 * 4) + (32 * 4) + (32 * 4));
@@ -32,6 +32,7 @@ var R3000a = function(psx)
 }
 
 R3000a.bootAddress = 0xbfc00000;
+R3000a.cyclesPerSecond = 33868800;
 
 R3000a.exceptions = {
 	reset: -1, // no matching bit in the Cause register
@@ -71,7 +72,6 @@ R3000a.srFlags = {
 
 R3000a.prototype.panic = function(message, pc)
 {
-	this.stopped = true;
 	throw new ExecutionException(message, pc);
 }
 
@@ -86,9 +86,9 @@ R3000a.prototype.__crash = function()
 	this.memory = null;
 }
 
-R3000a.prototype.stop = function()
+R3000a.prototype.yield = function()
 {
-	this.stopped = true;
+	this.shouldYield = true;
 }
 
 R3000a.prototype.reset = function()
@@ -164,12 +164,15 @@ R3000a.prototype.writeCOP0 = function(reg, value)
 
 R3000a.prototype.clock = function(ticks)
 {
-	this.ticks += ticks;
-	if (this.ticks >= 10000000)
-	{
-		this.psx.diags.log("10000000 ticks");
-		this.ticks = 0;
-	}
+	// 32 bits unsigned add
+	this.cycles += ticks;
+	var lastBit = this.cycles & 1;
+	this.cycles = (this.cycles >>> 1) * 2 + lastBit;
+	
+	this.psx.hardwareRegisters.update(this.cycles);
+	
+	if (this.cycles > R3000a.cyclesPerSecond)
+		throw new Error("CPU should have interrupted");
 }
 
 R3000a.prototype.run = function(pc, context)
@@ -177,16 +180,18 @@ R3000a.prototype.run = function(pc, context)
 	if (pc === undefined)
 		pc = R3000a.bootAddress;
 	
-	while (true)
+	while (!this.shouldYield)
 	{
 		var newAddress = this.executeBlock(pc, context);
 		pc = newAddress;
 	}
+	
+	this.shouldYield = false;
+	return pc;
 }
 
 R3000a.prototype.executeBlock = function(address, context)
 {
-	this.stopped = false;
 	return this.memory.compiled.invoke(this, address, context);
 }
 

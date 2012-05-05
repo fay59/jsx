@@ -1,27 +1,21 @@
 document.addEventListener("DOMContentLoaded", including.bind(null,
 	"js/core/disasm.js", "js/core/r3000a.js", "js/core/compiled.js", "js/core/hwregs.js",
 	"js/core/parallel.js", "js/core/memory.js", "js/core/recompiler.js", "js/core/asm.js",
-	"js/core/mdec.js", "js/core/gpu.js", function()
+	"js/core/mdec.js", "js/core/gpu.js", "js/core/psx.js", function()
 	{
 	document.querySelector("#bios").addEventListener("change", function()
 	{
 		var reader = new FileReader();
 		reader.onload = function()
 		{
-			var psx = new R3000a();
-			var bios = new GeneralPurposeBuffer(reader.result);
-			var mdec = new MotionDecoder();
-			var gpu = new GPU(null);
-			var hardwareRegisters = new HardwareRegisters(mdec, gpu);
-			var parallelPort = new ParallelPortMemoryRange();
-			var memory = new MemoryMap(hardwareRegisters, parallelPort, bios);
-			
-			mdec.memory = memory;
-			psx.reset(memory);
+			var psx = new PSX(PSX.noDiags, null, reader.result, [], []);
+			psx.reset();
 			
 			try
 			{
-				psx.run();
+				var now = new Date();
+				psx.runFrame();
+				document.querySelector("#crash").textContent = (new Date() - now) / 1000 + " seconds";
 			}
 			catch (e)
 			{

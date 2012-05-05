@@ -20,6 +20,11 @@ GPU.prototype.reset = function()
 	this.status = 0x14802000;
 }
 
+GPU.prototype.updateLace = function()
+{
+	this.psx.diags.warn("GPU should update lace");
+}
+
 GPU.prototype.processCommand = function(data)
 {
 	var command = (data >>> 24) & 0xff;
