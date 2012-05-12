@@ -164,7 +164,6 @@ var Tests = {
 			
 			var mdec = new MotionDecoder();
 			var hardware = new HardwareRegisters(mdec);
-			hardware.notifyUnknowns = false;
 			verify(hardware.u8, "u8");
 			verify(hardware.u16, "u16");
 			verify(hardware.u32, "u32");

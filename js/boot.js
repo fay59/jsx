@@ -1,20 +1,20 @@
 document.addEventListener("DOMContentLoaded", including.bind(null,
 	"js/core/disasm.js", "js/core/r3000a.js", "js/core/compiled.js", "js/core/hwregs.js",
 	"js/core/parallel.js", "js/core/memory.js", "js/core/recompiler.js", "js/core/asm.js",
-	"js/core/mdec.js", "js/core/gpu.js", "js/core/psx.js", function()
+	"js/core/mdec.js", "js/core/gpu.js", "js/core/spu.js", "js/core/psx.js", function()
 	{
 	document.querySelector("#bios").addEventListener("change", function()
 	{
 		var reader = new FileReader();
 		reader.onload = function()
 		{
-			var psx = new PSX(PSX.noDiags, null, reader.result, [], []);
-			psx.reset();
+			window.psx = new PSX(console, null, reader.result, [], []);
+			window.psx.reset();
 			
 			try
 			{
 				var now = new Date();
-				psx.runFrame();
+				window.psx.runFrame();
 				document.querySelector("#crash").textContent = (new Date() - now) / 1000 + " seconds";
 			}
 			catch (e)

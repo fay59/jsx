@@ -1,5 +1,7 @@
 var PSX = function(diags, webgl, bios, controller1StateArray, controller2StateArray)
 {
+	this.framesPerSecond = 50;
+	
 	this.diags = diags;
 	this.bios = new GeneralPurposeBuffer(bios);
 	this.parallelPort = new ParallelPortMemoryRange(this);
@@ -7,10 +9,12 @@ var PSX = function(diags, webgl, bios, controller1StateArray, controller2StateAr
 	this.cpu = new R3000a(this);
 	this.mdec = new MotionDecoder(this);
 	this.gpu = new GPU(this, webgl);
+	this.spu = new SPU(this, null);
 	this.hardwareRegisters = new HardwareRegisters(this, this.mdec, this.gpu);
 	this.memory = new MemoryMap(this, this.hardwareRegisters, this.parallelPort, this.bios);
 	
-	this.framesPerSecond = 50;
+	this.gpu.install(this.hardwareRegisters);
+	this.spu.install(this.hardwareRegisters);
 }
 
 PSX.noDiags = {
@@ -26,6 +30,7 @@ PSX.prototype.reset = function()
 	this.cpu.reset();
 	this.mdec.reset();
 	this.gpu.reset();
+	this.spu.reset();
 	this.memory.reset();
 }
 

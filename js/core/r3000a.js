@@ -114,11 +114,13 @@ R3000a.prototype.reset = function()
 R3000a.prototype.checkInterrupts = function(epc)
 {
 	if (this.memory.read32(0x1f801070) & this.memory.read32(0x1f801074))
+	{
 		if ((this.cop0_reg[12] & 0x401) == 0x401)
 		{
 			throw new Error("raised interrupt!");
 			return this.raiseException(epc, 0x400, false);
 		}
+	}
 }
 
 R3000a.prototype.raiseException = function(epc, exception, inDelaySlot)
@@ -169,7 +171,7 @@ R3000a.prototype.clock = function(ticks)
 	var lastBit = this.cycles & 1;
 	this.cycles = (this.cycles >>> 1) * 2 + lastBit;
 	
-	this.psx.hardwareRegisters.update(this.cycles);
+	this.psx.hardwareRegisters.update();
 	
 	if (this.cycles > R3000a.cyclesPerSecond)
 		throw new Error("CPU should have interrupted");
