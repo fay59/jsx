@@ -1,6 +1,7 @@
 var Recompiler = function()
 {
 	this.injectors = [];
+	this.tryToOptimize = true;
 }
 
 Recompiler.prototype.recompileFunction = function(memory, startAddress)
@@ -18,7 +19,8 @@ Recompiler.prototype.recompileFunction = function(memory, startAddress)
 	jsCode += "if (interruptPC !== undefined) return interruptPC;\n";
 	jsCode += "switch (pc) {\n";
 	
-	var context = new Recompiler.Context(memory, this.injectors.length == 0);
+	var optimize = this.tryToOptimize && this.injectors.length == 0;
+	var context = new Recompiler.Context(memory, optimize);
 	context.analyzeBranches(startAddress);
 	for (var i = 0; i < context.labels.length; i++)
 	{
@@ -182,18 +184,11 @@ Recompiler.formatHex = function(address, length)
 
 Recompiler.Context = function(memory, optimize)
 {
-	if (optimize)
-	{
-		this.gprValues = [0];
-		for (var i = 1; i < 34; i++)
-			this.gprValues[i] = null;
-	}
-	else
-	{
-		this.gprValue = {};
-		for (var i = 0; i < 34; i++)
-			this.gprValue.__defineGetter__(i, function() { return null; });
-	}
+	this.optimize = optimize;
+	this.gprValues = new Uint32Array(34);
+	this.known = [true];
+	for (var i = 1; i < 34; i++)
+		this.known[i] = false;
 
 	this.labels = [];
 	this.code = {};
@@ -205,6 +200,11 @@ Recompiler.Context = function(memory, optimize)
 	this.jittedInstructions = 0;
 	
 	this.memory = memory;
+}
+
+Recompiler.Context.prototype.panic = function(error)
+{
+	throw new Error(error);
 }
 
 Recompiler.Context.prototype.recompileOpcode = function(currentAddress, op)
@@ -263,6 +263,15 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 		return "this.panic('" + message + "', " + pc + ");\n";
 	}
 	
+	Recompiler.Context.prototype.setReg = function(reg, value)
+	{
+		if (!isFinite(reg) || !isFinite(value))
+			this.panic("arguments are not finite");
+		
+		this.gprValues[reg] = value;
+		this.known[reg] = value !== null;
+	}
+	
 	Recompiler.Context.prototype.analyzeBranches = function(startAddress)
 	{
 		var addressesToCompile = [startAddress];
@@ -310,11 +319,11 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 		var result = "";
 		for (var i = 1; i < this.gprValues.length; i++)
 		{
-			if (isKnown(this.gprValues[i]))
+			if (this.known[i])
 			{
 				result += "this.gpr[" + i + "] = " + this.gprValues[i] + ";\n";
 				if (nullify === undefined || nullify)
-					this.gprValues[i] = null;
+					this.setReg(i, null);
 			}
 		}
 		return result;
@@ -328,7 +337,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 		if (reg == 0)
 			return 0;
 		
-		if (isKnown(this.gprValues[reg]))
+		if (this.optimize && this.known[reg])
 			return this.gprValues[reg];
 		
 		return "this.gpr[" + reg + "]";
@@ -350,22 +359,16 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 		
 		if (dest == 0) return;
 		
-		if (isKnown(this.gprValues[source]) && isKnown(value))
+		var sourceValue = this.gpr(source);
+		if (this.optimize && isKnown(sourceValue) && isKnown(value))
 		{
-			this.gprValues[dest] = eval("this.gprValues[dest] = this.gprValues[source] " + op + " value");
+			this.setReg(dest, eval("sourceValue" + op + "value"));
 			return;
 		}
 		else
 		{
-			this.gprValues[dest] = null;
-			if (source == dest)
-			{
-				return this.lgpr(dest) + " " + op + "= " + value + ";\n";
-			}
-			else
-			{
-				return this.lgpr(dest) + " = " + this.gpr(source) + " " + op + " " + value + ";\n";
-			}
+			this.setReg(dest, null);
+			return this.lgpr(dest) + " = " + sourceValue + " " + op + " " + value + ";\n";
 		}
 	}
 	
@@ -376,23 +379,25 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 		
 		if (dest == 0) return;
 		
-		if (isKnown(this.gprValues[source]) && isKnown(value))
+		var sourceValue = this.gpr(source);
+		if (this.optimize && isKnown(sourceValue) && isKnown(value))
 		{
-			var overflowChecked = eval("this.gprValues[dest] = this.gprValues[source] " + op + " value");
+			var overflowChecked = eval("sourceValue" + op + "value");
 			if (overflowChecked > 0xFFFFFFFF || overflowChecked < -0x80000000)
 			{
-				this.gprValues[dest] = null;
+				this.setReg(dest, null);
 				return "this.panic('time to implement exceptions', " + address + ");\n";
 			}
 			else
 			{
-				this.gprValues[dest] = overflowChecked;
+				this.setReg(dest, overflowChecked);
 				return;
 			}
 		}
 		else
 		{
-			var jsCode = "overflowChecked = " + this.gpr(source) + " " + op + " " + value + ";\n";
+			this.setReg(dest, null);
+			var jsCode = "overflowChecked = " + sourceValue + " " + op + " " + value + ";\n";
 			jsCode += "if (overflowChecked > 0xFFFFFFFF || overflowChecked < -0x80000000)\n";
 			// TODO implement overflow exceptions
 			jsCode += "\tthis.panic('time to implement exceptions', " + address + ");\n";
@@ -413,7 +418,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 		offset = signExt(offset, 16);
 		address += " + " + offset;
 		
-		this.gprValues[into] = null;
+		this.setReg(into, null);
 		if (signedLoad)
 		{
 			var shift = 32 - bits;
@@ -510,12 +515,12 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	});
 	
 	impl("avsz3", function() {
-		countUnimplemented.call(this, "avsz3");
+		this.countUnimplemented("avsz3");
 		return panic("avsz3 is not implemented", this.address - 4);
 	});
 	
 	impl("avsz4", function() {
-		countUnimplemented.call(this, "avsz4");
+		this.countUnimplemented("avsz4");
 		return panic("avsz4 is not implemented", this.address - 4);
 	});
 	
@@ -524,7 +529,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	});
 	
 	impl("beql", function() {
-		countUnimplemented.call(this, "beql");
+		this.countUnimplemented("beql");
 		return panic("beql is not implemented", this.address - 4);
 	});
 	
@@ -533,7 +538,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	});
 	
 	impl("bgezal", function() {
-		countUnimplemented.call(this, "bgezal");
+		this.countUnimplemented("bgezal");
 		return panic("bgezal is not implemented", this.address - 4);
 	});
 	
@@ -550,7 +555,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	});
 	
 	impl("bltzal", function() {
-		countUnimplemented.call(this, "bltzal");
+		this.countUnimplemented("bltzal");
 		return panic("bltzal is not implemented", this.address - 4);
 	});
 	
@@ -563,53 +568,55 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	});
 	
 	impl("cc", function() {
-		countUnimplemented.call(this, "cc");
+		this.countUnimplemented("cc");
 		return panic("cc is not implemented", this.address - 4);
 	});
 	
 	impl("cdp", function() {
-		countUnimplemented.call(this, "cdp");
+		this.countUnimplemented("cdp");
 		return panic("cdp is not implemented", this.address - 4);
 	});
 	
 	impl("cfc0", function() {
-		countUnimplemented.call(this, "cfc0");
+		this.countUnimplemented("cfc0");
 		return panic("cfc0 is not implemented", this.address - 4);
 	});
 	
 	impl("cfc2", function() {
-		countUnimplemented.call(this, "cfc2");
+		this.countUnimplemented("cfc2");
 		return panic("cfc2 is not implemented", this.address - 4);
 	});
 	
 	impl("ctc0", function() {
-		countUnimplemented.call(this, "ctc0");
+		this.countUnimplemented("ctc0");
 		return panic("ctc0 is not implemented", this.address - 4);
 	});
 	
 	impl("ctc2", function() {
-		countUnimplemented.call(this, "ctc2");
+		this.countUnimplemented("ctc2");
 		return panic("ctc2 is not implemented", this.address - 4);
 	});
 	
 	impl("dpcl", function() {
-		countUnimplemented.call(this, "dpcl");
+		this.countUnimplemented("dpcl");
 		return panic("dpcl is not implemented", this.address - 4);
 	});
 	
 	impl("div", function(s, t) {
 		var sVal = this.gpr(s);
 		var tVal = this.gpr(t);
-		if (isKnown(sVal) && isKnown(tVal))
+		if (this.optimize && isKnown(sVal) && isKnown(tVal))
 		{
 			sVal |= 0;
 			tVal |= 0;
-			this.gprValues[32] = sVal % tVal;
-			this.gprValues[33] = sVal / tVal;
+			this.setReg(32, sVal % tVal);
+			this.setReg(33, sVal / tVal);
 			return;
 		}
 		else
 		{
+			this.setReg(32, null);
+			this.setReg(33, null);
 			var jsCode = "this.gpr[32] = " + sign(this.gpr(s)) + " % " + sign(this.gpr(t)) + ";\n";
 			jsCode += "this.gpr[33] = " + sign(this.gpr(s)) + " / " + sign(this.gpr(t)) + ";\n";
 			return jsCode;
@@ -619,16 +626,16 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	impl("divu", function(s, t) {
 		var sVal = this.gpr(s);
 		var tVal = this.gpr(t);
-		if (isKnown(sVal) && isKnown(tVal))
+		if (this.optimize && isKnown(sVal) && isKnown(tVal))
 		{
-			sVal = Recompiler.unsign(sVal);
-			tVal = Recompiler.unsign(tVal);
-			this.gprValues[32] = sVal % tVal;
-			this.gprValues[33] = sVal / tVal;
+			this.setReg(32, sVal % tVal);
+			this.setReg(33, sVal / tVal);
 			return;
 		}
 		else
 		{
+			this.setReg(32, null);
+			this.setReg(33, null);
 			var jsCode = "this.gpr[32] = " + this.gpr(s) + " % " + this.gpr(t) + ";\n";
 			jsCode += "this.gpr[33] = " + this.gpr(s) + " / " + this.gpr(t) + ";\n";
 			return jsCode;
@@ -636,27 +643,27 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	});
 	
 	impl("dpcs", function() {
-		countUnimplemented.call(this, "dpcs");
+		this.countUnimplemented("dpcs");
 		return panic("dpcs is not implemented", this.address - 4);
 	});
 	
 	impl("dpct", function() {
-		countUnimplemented.call(this, "dpct");
+		this.countUnimplemented("dpct");
 		return panic("dpct is not implemented", this.address - 4);
 	});
 	
 	impl("gpf", function() {
-		countUnimplemented.call(this, "gpf");
+		this.countUnimplemented("gpf");
 		return panic("gpf is not implemented", this.address - 4);
 	});
 	
 	impl("gpl", function() {
-		countUnimplemented.call(this, "gpl");
+		this.countUnimplemented("gpl");
 		return panic("gpl is not implemented", this.address - 4);
 	});
 	
 	impl("intpl", function() {
-		countUnimplemented.call(this, "intpl");
+		this.countUnimplemented("intpl");
 		return panic("intpl is not implemented", this.address - 4);
 	});
 	
@@ -712,7 +719,10 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	});
 	
 	impl("lui", function(t, i) {
-		this.gprValues[t] = i << 16;
+		if (this.optimize)
+			this.setReg(t, i << 16);
+		else
+			return this.gpr(t) + " = " + (i << 16) + ";\n";
 	});
 	
 	impl("lw", function(s, t, i) {
@@ -720,48 +730,48 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	});
 	
 	impl("lwc2", function() {
-		countUnimplemented.call(this, "lwc2");
+		this.countUnimplemented("lwc2");
 		return panic("lwc2 is not implemented", this.address - 4);
 	});
 	
 	impl("lwl", function() {
-		countUnimplemented.call(this, "lwl");
+		this.countUnimplemented("lwl");
 		return panic("lwl is not implemented", this.address - 4);
 	});
 	
 	impl("lwr", function() {
-		countUnimplemented.call(this, "lwr");
+		this.countUnimplemented("lwr");
 		return panic("lwr is not implemented", this.address - 4);
 	});
 	
 	impl("mfc0", function(t, l) { // t is the gpr, l is the cop0 reg
-		this.gprValues[t] = null;
+		this.setReg(t, null);
 		return this.lgpr(t) + " = this.cop0_reg[" + l + "];\n";
 	});
 	
 	impl("mfc2", function() {
-		countUnimplemented.call(this, "mfc2");
+		this.countUnimplemented("mfc2");
 		return panic("mfc2 is not implemented", this.address - 4);
 	});
 	
 	impl("mfhi", function(d) {
 		var hi = this.gpr(32);
-		if (isKnown(hi))
-			this.gprValues[d] = hi;
+		if (this.optimize && isKnown(hi))
+			this.setReg(d, hi);
 		else
 		{
-			this.gprValues[d] = null;
+			this.setReg(d, null);
 			return this.lgpr(d) + " = " + hi + ";\n";
 		}
 	});
 	
 	impl("mflo", function(d) {
 		var lo = this.gpr(33);
-		if (isKnown(lo))
-			this.gpr[d] = lo;
+		if (this.optimize && isKnown(lo))
+			this.setReg(d, lo);
 		else
 		{
-			this.gprValues[d] = null;
+			this.setReg(d, null);
 			return this.lgpr(d) + " = " + lo + ";\n";
 		}
 	});
@@ -771,98 +781,102 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	});
 	
 	impl("mtc2", function() {
-		countUnimplemented.call(this, "mtc2");
+		this.countUnimplemented("mtc2");
 		return panic("mtc2 is not implemented", this.address - 4);
 	});
 	
 	impl("mthi", function(d) {
 		var dValue = this.gpr(d);
-		if (isKnown(dValue))
-			this.gprValues[32] = dValue;
+		if (this.optimize && isKnown(dValue))
+			this.setReg(32, dValue);
 		else
 		{
-			this.gprValues[d] = null;
+			this.setReg(32, null);
 			return this.lgpr(32) + " = " + dValue + ";\n";
 		}
 	});
 	
 	impl("mtlo", function(d) {
 		var dValue = this.gpr(d);
-		if (isKnown(dValue))
-			this.gprValues[33] = dValue;
+		if (this.optimize && isKnown(dValue))
+			this.setReg(33, dValue);
 		else
 		{
-			this.gprValues[d] = null;
+			this.setReg(33, null);
 			return this.lgpr(33) + " = " + dValue + ";\n";
 		}
 	});
 	
 	impl("mult", function() {
-		countUnimplemented.call(this, "mult");
+		this.countUnimplemented("mult");
 		return panic("mult is not implemented", this.address - 4);
 	});
 	
 	impl("multu", function(s, t) {
 		var sValue = this.gpr(s);
 		var tValue = this.gpr(t);
-		if (isKnown(sValue) && isKnown(tValue))
+		if (this.optimize && isKnown(sValue) && isKnown(tValue))
+		{
 			R3000a.runtime.multu(this.gprValues, sValue, tValue);
+			this.known[32] = true;
+			this.known[33] = true;
+		}
 		else
 		{
-			this.gprValues[32] = null;
-			this.gprValues[33] = null;
+			this.setReg(32, null);
+			this.setReg(33, null);
 			return "R3000a.runtime.multu(this.gpr, " + this.gpr(t) + ", " + this.gpr(s) + ");\n";
 		}
 	});
 	
 	impl("mvmva", function() {
-		countUnimplemented.call(this, "mvmva");
+		this.countUnimplemented("mvmva");
 		return panic("mvmva is not implemented", this.address - 4);
 	});
 	
 	impl("nccs", function() {
-		countUnimplemented.call(this, "nccs");
+		this.countUnimplemented("nccs");
 		return panic("nccs is not implemented", this.address - 4);
 	});
 	
 	impl("ncct", function() {
-		countUnimplemented.call(this, "ncct");
+		this.countUnimplemented("ncct");
 		return panic("ncct is not implemented", this.address - 4);
 	});
 	
 	impl("ncds", function() {
-		countUnimplemented.call(this, "ncds");
+		this.countUnimplemented("ncds");
 		return panic("ncds is not implemented", this.address - 4);
 	});
 	
 	impl("ncdt", function() {
-		countUnimplemented.call(this, "ncdt");
+		this.countUnimplemented("ncdt");
 		return panic("ncdt is not implemented", this.address - 4);
 	});
 	
 	impl("nclip", function() {
-		countUnimplemented.call(this, "nclip");
+		this.countUnimplemented("nclip");
 		return panic("nclip is not implemented", this.address - 4);
 	});
 	
 	impl("ncs", function() {
-		countUnimplemented.call(this, "ncs");
+		this.countUnimplemented("ncs");
 		return panic("ncs is not implemented", this.address - 4);
 	});
 	
 	impl("nct", function() {
-		countUnimplemented.call(this, "nct");
+		this.countUnimplemented("nct");
 		return panic("nct is not implemented", this.address - 4);
 	});
 	
 	impl("nor", function(s, t, d) {
 		var sValue = this.gpr(s);
 		var tValue = this.gpr(t);
-		if (isKnown(sValue) && isKnown(tValue))
-			this.gprValues[d] = ~(sValue | tValue);
+		if (this.optimize && isKnown(sValue) && isKnown(tValue))
+			this.setReg(d, ~(sValue | tValue));
 		else
 		{
-			this.gprValues[d] = null;
+			this.setReg(d, null);
 			return this.lgpr(d) + " = ~(" + this.gpr(s) + " | " + this.gpr(t) + ");\n";
 		}
 	});
@@ -880,12 +894,12 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	});
 	
 	impl("rtps", function() {
-		countUnimplemented.call(this, "rtps");
+		this.countUnimplemented("rtps");
 		return panic("rtps is not implemented", this.address - 4);
 	});
 	
 	impl("rtpt", function() {
-		countUnimplemented.call(this, "rtpt");
+		this.countUnimplemented("rtpt");
 		return panic("rtpt is not implemented", this.address - 4);
 	});
 	
@@ -908,33 +922,33 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	impl("slt", function(s, t, d) {
 		var sValue = this.gpr(s);
 		var tValue = this.gpr(t);
-		if (isKnown(sValue) && isKnown(tValue))
-			this.gprValues[d] = ((sValue | 0) < (tValue | 0)) | 0;
+		if (this.optimize && isKnown(sValue) && isKnown(tValue))
+			this.setReg(d, ((sValue | 0) < (tValue | 0)) | 0);
 		else
 		{
-			this.gprValues[d] = null;
+			this.setReg(d, null);
 			return this.lgpr(d) + " = " + sign(this.gpr(s)) + " < " + sign(this.gpr(t)) + ";\n";
 		}
 	});
 	
 	impl("slti", function(s, t, i) {
 		var sValue = this.gpr(s);
-		if (isKnown(sValue) && isKnown(tValue))
-			this.gprValues[t] = ((sValue | 0) < signExt(i, 16)) | 0;
+		if (this.optimize && isKnown(sValue) && isKnown(tValue))
+			this.setReg(t, ((sValue | 0) < signExt(i, 16)) | 0);
 		else
 		{
-			this.gprValues[t] = null;
+			this.setReg(t, null);
 			return this.lgpr(t) + " = " + sign(this.gpr(s)) + " < " + signExt(i, 16) + ";\n";
 		}
 	});
 	
 	impl("sltiu", function(s, t, i) {
 		var sValue = this.gpr(s);
-		if (isKnown(sValue) && isKnown(tValue))
-			this.gprValues[t] = (Recompiler.unsign(sValue) < i) | 0;
+		if (this.optimize && isKnown(sValue) && isKnown(tValue))
+			this.setReg(t, (Recompiler.unsign(sValue) < i) | 0);
 		else
 		{
-			this.gprValues[t] = null;
+			this.setReg(t, null);
 			return this.lgpr(t) + " = " + this.gpr(s) + " < " + i + ";\n";
 		}
 	});
@@ -942,17 +956,17 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	impl("sltu", function(s, t, d) {
 		var sValue = this.gpr(s);
 		var tValue = this.gpr(t);
-		if (isKnown(sValue) && isKnown(tValue))
-			this.gprValues[d] = (Recompiler.unsign(sValue) < Recompiler.unsign(tValue)) | 0;
+		if (this.optimize && isKnown(sValue) && isKnown(tValue))
+			this.setReg(d, (Recompiler.unsign(sValue) < Recompiler.unsign(tValue)) | 0);
 		else
 		{
-			this.gprValues[d] = null;
+			this.setReg(d, null);
 			return this.lgpr(d) + " = " + this.gpr(s) + " < " + this.gpr(t) + ";\n";
 		}
 	});
 	
 	impl("sqr", function() {
-		countUnimplemented.call(this, "sqr");
+		this.countUnimplemented("sqr");
 		return panic("sqr is not implemented", this.address - 4);
 	});
 	
@@ -973,7 +987,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	});
 	
 	impl("sub", function() {
-		countUnimplemented.call(this, "sub");
+		this.countUnimplemented("sub");
 		return panic("sub is not implemented", this.address - 4);
 	});
 	
@@ -986,32 +1000,34 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	});
 	
 	impl("swc2", function() {
-		countUnimplemented.call(this, "swc2");
+		this.countUnimplemented("swc2");
 		return panic("swc2 is not implemented", this.address - 4);
 	});
 	
 	impl("swl", function() {
-		countUnimplemented.call(this, "swl");
+		this.countUnimplemented("swl");
 		return panic("swl is not implemented", this.address - 4);
 	});
 	
 	impl("swr", function() {
-		countUnimplemented.call(this, "swr");
+		this.countUnimplemented("swr");
 		return panic("swr is not implemented", this.address - 4);
 	});
 	
 	impl("syscall", function() {
-		return "return this.raiseException(" + hex(this.address - 4) + ", 0x20, " + this.isDelaySlot + ");\n";
+		var jsCode = this.flushRegisters();
+		jsCode += "return this.raiseException(" + hex(this.address) + ", 0x20, " + this.isDelaySlot + ");\n";
+		return jsCode;
 	});
 	
 	impl("xor", function() {
-		countUnimplemented.call(this, "xor");
+		this.countUnimplemented("xor");
 		return panic("xor is not implemented", this.address - 4);
 	});
 	
 	impl("xori", function() {
 		// the immediate is NOT sign extended
-		countUnimplemented.call(this, "xori");
+		this.countUnimplemented("xori");
 		return panic("xori is not implemented", this.address - 4);
 	});
 })();

@@ -622,13 +622,11 @@ var Tests = {
 		{
 			var missingInstructions = [];
 			var instructionCount = 0;
-			var recompiler = new Recompiler();
-			recompiler.memory = new MemoryCache({compiled: null});
-			recompiler.unimplementedInstructionCounts = {};
+			var recompiler = new Recompiler.Context(new MemoryCache({compiled: null}), false);
 			for (var instruction in Disassembler.patternData)
 			{
-				var jsCode = recompiler[instruction].call(recompiler, 0, 0, 0);
-				if (jsCode.indexOf("is not implemented") != -1)
+				var jsCode = recompiler[instruction].call(recompiler, 1, 1, 1);
+				if (jsCode !== undefined && jsCode.indexOf("is not implemented") != -1)
 					missingInstructions.push(instruction);
 				
 				instructionCount++;
