@@ -163,7 +163,7 @@ var Tests = {
 			}
 			
 			var mdec = new MotionDecoder();
-			var hardware = new HardwareRegisters(mdec);
+			var hardware = new HardwareRegisters({diags: PSX.noDiags}, mdec);
 			verify(hardware.u8, "u8");
 			verify(hardware.u16, "u16");
 			verify(hardware.u32, "u32");

@@ -1,15 +1,5 @@
 var Recompiler = function()
 {
-	this.memory = null;
-	this.code = {};
-	
-	this.startAddress = null;
-	this.compiledAddresses = [];
-	this.addressesToCompile = [];
-	this.calls = [];
-	this.address = 0;
-	this.isDelaySlot = false; // if the instruction is in a delay slot
-	this.opcodes = {};
 	this.injectors = [];
 }
 
@@ -18,144 +8,105 @@ Recompiler.prototype.recompileFunction = function(memory, startAddress)
 	if (memory === undefined || startAddress === undefined)
 		throw new Error("memory and startAddress must be defined");
 	this.memory = memory;
-	this.startAddress = startAddress;
-	this.code = {};
-	
-	this.compiledAddresses = [];
-	this.addressesToCompile = [startAddress];
-	this.calls = [];
-	this.address = 0;
-	this.opcodes = {};
-	
-	this.unimplementedInstructionCounts = {};
-	this.jittedInstructions = 0;
 	
 	// compiled memory ranges
-	var ranges = {};
+	var ranges = [];
 	
-	while (this.addressesToCompile.length > 0)
+	var jsCode = Recompiler.functionPrelude;
+	jsCode += "while (true) {\n";
+	jsCode += "var interruptPC = this.checkInterrupts(pc);\n";
+	jsCode += "if (interruptPC !== undefined) return interruptPC;\n";
+	jsCode += "switch (pc) {\n";
+	
+	var context = new Recompiler.Context(memory, this.injectors.length == 0);
+	context.analyzeBranches(startAddress);
+	for (var i = 0; i < context.labels.length; i++)
 	{
-		this.address = this.addressesToCompile.shift();
-		this.compiledAddresses.push(this.address);
+		var address = context.labels[i];
+		var nextLabel = i + 1 < context.labels.length
+			? context.labels[i + 1]
+			: 0xFFFFFFFF;
+		var lastTick = address;
 		
-		var rangeStart = this.address;
-		while (!(this.address in this.code))
+		var keepGoing = true;
+		jsCode += context.flushRegisters();
+		jsCode += "case 0x" + Recompiler.formatHex(address) + ":\n";
+		while (keepGoing && address < nextLabel)
 		{
-			var currentAddress = this.address;
-			var op = this.nextInstruction();
-			this.code[currentAddress] = this.recompileOpcode(currentAddress, op);
+			var pattern = this.memory.read32(address);
+			var op = Disassembler.getOpcode(pattern);
+			if (op == null) this.panic(pattern, this.address);
 			
-			// a jump means the end of a block
-			if (op.instruction.name == "j" || op.instruction.name == "jr")
-				break;
+			keepGoing = op.instruction.name[0] != "j";
+			if (op.instruction.name[0] == 'b' || !keepGoing)
+			{
+				jsCode += "this.clock(" + ((address - lastTick) >>> 2) + ");\n";
+				lastTick = address;
+			}
+			
+			var injectedBefore = this._injectBefore(address, op, this.isDelaySlot);
+			var code = context.recompileOpcode(address, op);
+			var injectedAfter = this._injectAfter(address, op, this.isDelaySlot);
+			
+			jsCode += injectedBefore + code + injectedAfter;
+			address += 4;
 		}
-		ranges[rangeStart] = this.address;
-	}
-	
-	// collapse compiled code memory ranges
-	var keys = [];
-	for (var key in ranges) keys.push(parseInt(key));
-	keys.sort(function(a, b) { return a - b; });
-	
-	this.ranges = [];
-	for (var i = 0; i < keys.length; i++)
-	{
-		var start = keys[i];
-		if (start === undefined) continue
 		
-		var end = ranges[start];
-		while (end in ranges)
-		{
-			var newEnd = ranges[end];
-			delete ranges[end];
-			end = newEnd;
-		}
-		this.ranges.push([start, end]);
+		if (address == nextLabel)
+			jsCode += "this.clock(" + ((address - lastTick) >>> 2) + ");\n";
+		
+		ranges.push([context.labels[i], address]);
 	}
+	jsCode += "default: this.panic('unreferenced block 0x' + Recompiler.formatHex(pc), pc); break;\n";
+	jsCode += "}\n}\n";
 	
-	return this.compile();
+	var functionName = "." + Recompiler.formatHex(this.startAddress);
+	var compiled = new Function("pc", "context", jsCode);
+	compiled.name = functionName;
+	
+	return {
+		name: functionName,
+		code: compiled,
+		
+		labels: context.labels,
+		
+		ranges: ranges,
+		totalCount: context.jittedInstructions,
+		unimplemented: context.unimplementedInstructionCounts,
+	};
 }
 
-Recompiler.prototype.recompileOpcode = function(currentAddress, op)
+// recompile one single instruction, useful for stepping
+Recompiler.prototype.recompileOne = function(memory, address)
 {
+	this.memory = memory;
+	this.address = address;
+	
+	var context = new Recompiler.Context(memory, false);
+	
+	var instruction = memory.read32(address);
+	var op = Disassembler.getOpcode(instruction);
 	var injectedBefore = this._injectBefore(currentAddress, op, this.isDelaySlot);
-	var instructionCode = this[op.instruction.name].apply(this, op.params);
-
-	if (instructionCode === undefined)
-		this.panic(commentString + " was recompiled as undefined");
-
-	var addressString = Recompiler.formatHex(currentAddress);
-	var opcodeString = Disassembler.getOpcodeAsString(op);
-	var commentString = addressString + ": " + opcodeString;
-	var jsComment = "// " + commentString + "\n";
+	var code = context.recompileOpcode(address, op);
 	var injectedAfter = this._injectAfter(currentAddress, op, this.isDelaySlot);
 	
-	return injectedBefore + jsComment + instructionCode + injectedAfter;
-}
-
-Recompiler.prototype.addLabel = function(label, opAddress)
-{
-	var labelString = Recompiler.formatHex(label);
-	var opAddressString = Recompiler.formatHex(opAddress);
+	var code = Recompiler.functionPrelude
+		+ "var pc = 0x" + Recompiler.formatHex(address) + " + 4;\n"
+		+ "do {\n"
+		+ injectedBefore + code + injectedAfter
+		+ "} while (false);\n";
 	
-	// check that the location actually exists
-	if (this.memory.translate)
-	{
-		var translated = this.memory.translate(label);
-		if (translated.buffer == MemoryMap.unmapped)
-			this.panic("branch or jump to unmapped location " + labelString + " from address " + opAddressString);
-	}
-		
-	// check that the label is not in a delay slot
-	// just warn if so, because the previous word is possibly not an instruction
-	var bits = this.memory.read32(label - 4);
-	var op = Disassembler.getOpcode(bits);
-	if (op != null)
-	{
-		var firstLetter = op.instruction.name[0];
-		if (firstLetter == 'j')
-		{
-			var message = "label " + labelString + " from " + opAddressString + " falling into the delay slot of a jump";
-			this.diags.warn(message);
-		}
-	}
-
-	if (this.compiledAddresses.indexOf(label) == -1)
-		this.addressesToCompile.push(label);
-}
-
-Recompiler.prototype.match = function(instruction)
-{
-	for (var i = 0; i < Disassembler.Patterns.length; i++)
-	{
-		var pattern = Disassembler.Patterns[i];
-		var matched = pattern.tryParse(instruction);
-		if (matched !== null)
-		{
-			return {instruction: pattern.name, params: matched};
-		}
-	}
-	return null;
-}
-
-Recompiler.prototype.nextInstruction = function()
-{
-	if (this.memory.translate)
-	{
-		var translated = this.memory.translate(this.address);
-		if (translated.buffer == MemoryMap.unmapped)
-			this.panic("accessing invalid memory address " + Recompiler.formatHex(this.address));
-	}
+	// account for the delay slot, it needs to be skipped in the case of a
+	// branch or call (but NOT in the case of a jump!)
+	if (op.instruction.name == 'jal' || op.instruction.name == 'jalr')
+		code += "pc += 4;\n";
 	
-	var pattern = this.memory.read32(this.address);
-	var op = Disassembler.getOpcode(pattern);
-	if (op == null) this.panic(pattern, this.address);
+	code += "return pc;\n";
 	
-	this.opcodes[this.address] = op;
-	this.address += 4;
-	this.jittedInstructions++;
+	this.address = 0;
+	this.memory = null;
 	
-	return op;
+	return new Function("context", code);
 }
 
 Recompiler.prototype.panic = function(instruction, address)
@@ -173,96 +124,6 @@ Recompiler.prototype.panic = function(instruction, address)
 	{
 		throw new Error(instruction);
 	}
-}
-
-Recompiler.functionPrelude = "var overflowChecked = 0;\n";
-
-Recompiler.prototype.compile = function()
-{
-	var jsCode = Recompiler.functionPrelude;
-	jsCode += "while (true) {\n";
-	jsCode += "var interruptPC = this.checkInterrupts(pc);\n";
-	jsCode += "if (interruptPC !== undefined) return interruptPC;\n";
-	jsCode += "switch (pc) {\n";
-	
-	// keys need to be sorted to be consistent
-	var keys = [];
-	for (var key in this.code) keys.push(parseInt(key));
-	keys.sort(function(a, b) { return a - b; });
-	
-	// increment the Count register (cp0_reg[9])
-	var lastKey = keys[0];
-	for (var i = 0; i < keys.length; i++)
-	{
-		var address = keys[i];
-		
-		// should we update the Count register?
-		var nextAddress = keys[i + 1];
-		if (nextAddress == undefined) nextAddress = address + 4;
-		var opcodeName = this.opcodes[address].instruction.name;
-		var isJump = opcodeName[0] == 'j' || opcodeName[0] == 'b';
-		
-		// don't add a clock call on the first instruction
-		if ((this.compiledAddresses.indexOf(nextAddress) != -1 || isJump) && i != 0)
-		{
-			jsCode += "this.clock(" + (nextAddress - lastKey) + ");\n\n";
-			lastKey = nextAddress;
-		}
-		
-		// should we create a new label?
-		if (this.compiledAddresses.indexOf(address) != -1)
-		{
-			jsCode += "case 0x" + Recompiler.formatHex(address) + ":\n";
-			jsCode += this._injectAtLabel(address);
-		}
-		
-		jsCode += this.code[address] + "\n";
-	}
-	
-	jsCode += "default: this.panic('unreferenced block 0x' + Recompiler.formatHex(pc), pc); break;\n";
-	jsCode += "}\n}";
-	
-	var functionName = "." + Recompiler.formatHex(this.startAddress);
-	var compiled = new Function("pc", "context", jsCode);
-	compiled.name = functionName;
-	
-	return {
-		name: functionName,
-		code: compiled,
-		
-		references: this.calls,
-		labels: this.compiledAddresses,
-		
-		ranges: this.ranges,
-		totalCount: this.jittedInstructions,
-		unimplemented: this.unimplementedInstructionCounts,
-	};
-}
-
-// recompile one single instruction, useful for stepping
-Recompiler.prototype.recompileOne = function(memory, address)
-{
-	this.memory = memory;
-	this.address = address;
-	
-	var op = this.nextInstruction();
-	var code = Recompiler.functionPrelude
-		+ "var pc = 0x" + Recompiler.formatHex(address) + " + 4;\n"
-		+ "do {\n"
-		+ this.recompileOpcode(address, op)
-		+ "} while (false);\n";
-	
-	// account for the delay slot, it needs to be skipped in the case of a
-	// branch or call (but NOT in the case of a jump!)
-	if (op.instruction.name == 'jal' || op.instruction.name == 'jalr')
-		code += "pc += 4;\n";
-	
-	code += "return pc;\n";
-	
-	this.address = 0;
-	this.memory = null;
-	
-	return new Function("context", code);
 }
 
 Recompiler.prototype.addInjector = function(injector)
@@ -302,6 +163,8 @@ Recompiler.prototype._injectCallback = function(fn)
 	return injected;
 }
 
+Recompiler.functionPrelude = "var overflowChecked = 0;\n";
+
 Recompiler.unsign = function(x)
 {
 	var lastBit = x & 1;
@@ -317,37 +180,62 @@ Recompiler.formatHex = function(address, length)
 	return output;
 }
 
+Recompiler.Context = function(memory, optimize)
+{
+	if (optimize)
+	{
+		this.gprValues = [0];
+		for (var i = 1; i < 34; i++)
+			this.gprValues[i] = null;
+	}
+	else
+	{
+		this.gprValue = {};
+		for (var i = 0; i < 34; i++)
+			this.gprValue.__defineGetter__(i, function() { return null; });
+	}
+
+	this.labels = [];
+	this.code = {};
+	this.calls = [];
+	this.address = 0;
+	this.isDelaySlot = false;
+	this.opcodes = {};
+	this.unimplementedInstructionCounts = {};
+	this.jittedInstructions = 0;
+	
+	this.memory = memory;
+}
+
+Recompiler.Context.prototype.recompileOpcode = function(currentAddress, op)
+{
+	this.address = currentAddress;
+	this.jittedInstructions++;
+	var instructionCode = this[op.instruction.name].apply(this, op.params);
+
+	if (instructionCode === undefined)
+		instructionCode = "";
+
+	var addressString = Recompiler.formatHex(currentAddress);
+	var opcodeString = Disassembler.getOpcodeAsString(op);
+	var commentString = addressString + ": " + opcodeString;
+	var jsComment = "// " + commentString + "\n";
+	
+	return jsComment + instructionCode;
+}
+
+Recompiler.Context.prototype.countUnimplemented = function(instruction)
+{
+	if (!(instruction in this.unimplementedInstructionCounts))
+		this.unimplementedInstructionCounts[instruction] = 0;
+	this.unimplementedInstructionCounts[instruction]++;
+}
+
 ;(function()
 {
-	/// OPCODES
-	/// A MIPS reference can be found at http://www.mrc.uidaho.edu/mrc/people/jff/digital/MIPSir.html
-	/// though the page doesn't have the complete reference for the 4300i CPU.
-	/// Each opcode function accepts a handful of arguments. These arguments
-	/// can be statically decoded, which is pretty cool for recompilation.
-	/// BIG TIME HEURISTIC FOR LINKING JUMPS. We're not using the link rgister
-	/// at all, just going through the assumption that anything that deals
-	/// with it can be safely replaced by a "regular" call.
-	function impl(inst, func)
+	function isKnown(x)
 	{
-		Recompiler.prototype[inst] = func;
-	}
-	
-	function countUnimplemented(instruction)
-	{
-		if (!(instruction in this.unimplementedInstructionCounts))
-			this.unimplementedInstructionCounts[instruction] = 0;
-		this.unimplementedInstructionCounts[instruction]++;
-	}
-	
-	function gpr(reg)
-	{
-		if (reg === undefined)
-			throw new Error("undefined value");
-		
-		// r0 is always 0
-		if (reg === 0) return 0;
-		
-		return "this.gpr[" + reg + "]";
+		return x != null && isFinite(x);
 	}
 	
 	function signExt(value, bitSize)
@@ -375,75 +263,195 @@ Recompiler.formatHex = function(address, length)
 		return "this.panic('" + message + "', " + pc + ");\n";
 	}
 	
-	function binaryOp(op, dest, source, value)
+	Recompiler.Context.prototype.analyzeBranches = function(startAddress)
+	{
+		var addressesToCompile = [startAddress];
+		var visitedAddresses = {};
+		
+		var self = this;
+		function addToAddresses(addr)
+		{
+			if (self.labels.indexOf(addr) == -1)
+				addressesToCompile.push(addr);
+		}
+		
+		while (addressesToCompile.length > 0)
+		{
+			var address = addressesToCompile.shift();
+			this.labels.push(address);
+			
+			while (true)
+			{
+				if (address in visitedAddresses)
+					break;
+				
+				var instruction = this.memory.read32(address);
+				visitedAddresses[address] = true;
+				
+				var op = Disassembler.getOpcode(instruction);
+				if (op.instruction.name == "j" || op.instruction.name == "jr")
+				{
+					break;
+				}
+				else if (op.instruction.name[0] == "b")
+				{
+					var offset = op.params[op.params.length - 1];
+					var targetAddress = Recompiler.unsign(address + 4 + (signExt(offset, 16) << 2));
+					addToAddresses(targetAddress);
+				}
+				address += 4;
+			}
+		}
+		this.labels.sort(function(a,b) { return a - b; });
+	}
+
+	Recompiler.Context.prototype.flushRegisters = function(nullify)
+	{
+		var result = "";
+		for (var i = 1; i < this.gprValues.length; i++)
+		{
+			if (isKnown(this.gprValues[i]))
+			{
+				result += "this.gpr[" + i + "] = " + this.gprValues[i] + ";\n";
+				if (nullify === undefined || nullify)
+					this.gprValues[i] = null;
+			}
+		}
+		return result;
+	}
+	
+	Recompiler.Context.prototype.gpr = function(reg)
+	{
+		if (reg === undefined)
+			throw new Error("undefined value");
+			
+		if (reg == 0)
+			return 0;
+		
+		if (isKnown(this.gprValues[reg]))
+			return this.gprValues[reg];
+		
+		return "this.gpr[" + reg + "]";
+	}
+	
+	// return something that's suitable as a left-hand side expression
+	Recompiler.Context.prototype.lgpr = function(reg)
+	{
+		if (reg == 0)
+			return "this.panic('uncaught write to r0'); //";
+		
+		return "this.gpr[" + reg + "]";
+	}
+	
+	Recompiler.Context.prototype.binaryOp = function(op, dest, source, value)
 	{
 		if (op === undefined || dest === undefined || source === undefined || value === undefined)
 			this.panic("undefined argument");
 		
-		if (dest == 0) return ";\n";
-		if (dest == source)
-			return gpr(dest) + " " + op + "= " + value + ";\n";
+		if (dest == 0) return;
 		
-		return gpr(dest) + " = " + gpr(source) + " " + op + " " + value + ";\n";
+		if (isKnown(this.gprValues[source]) && isKnown(value))
+		{
+			this.gprValues[dest] = eval("this.gprValues[dest] = this.gprValues[source] " + op + " value");
+			return;
+		}
+		else
+		{
+			this.gprValues[dest] = null;
+			if (source == dest)
+			{
+				return this.lgpr(dest) + " " + op + "= " + value + ";\n";
+			}
+			else
+			{
+				return this.lgpr(dest) + " = " + this.gpr(source) + " " + op + " " + value + ";\n";
+			}
+		}
 	}
 	
-	function binaryOpTrap(address, op, dest, source, value)
+	Recompiler.Context.prototype.binaryOpTrap = function(address, op, dest, source, value)
 	{
 		if (op === undefined || dest === undefined || source === undefined || value === undefined)
 			this.panic("undefined argument");
 		
-		if (dest == 0) return ";\n";
-		var jsCode = "overflowChecked = " + gpr(source) + " " + op + " " + value + ";\n";
-		jsCode += "if (overflowChecked > 0xFFFFFFFF || overflowChecked < -0x80000000)\n";
-		// TODO implement overflow exceptions
-		jsCode += "\tthis.panic('time to implement exceptions', " + address + ");\n";
-		jsCode += gpr(dest) + " = overflowChecked;\n";
-		return jsCode;
+		if (dest == 0) return;
+		
+		if (isKnown(this.gprValues[source]) && isKnown(value))
+		{
+			var overflowChecked = eval("this.gprValues[dest] = this.gprValues[source] " + op + " value");
+			if (overflowChecked > 0xFFFFFFFF || overflowChecked < -0x80000000)
+			{
+				this.gprValues[dest] = null;
+				return "this.panic('time to implement exceptions', " + address + ");\n";
+			}
+			else
+			{
+				this.gprValues[dest] = overflowChecked;
+				return;
+			}
+		}
+		else
+		{
+			var jsCode = "overflowChecked = " + this.gpr(source) + " " + op + " " + value + ";\n";
+			jsCode += "if (overflowChecked > 0xFFFFFFFF || overflowChecked < -0x80000000)\n";
+			// TODO implement overflow exceptions
+			jsCode += "\tthis.panic('time to implement exceptions', " + address + ");\n";
+			jsCode += this.lgpr(dest) + " = overflowChecked;\n";
+			return jsCode;
+		}
 	}
 	
-	function load(bits, addressReg, offset, into, signedLoad)
+	Recompiler.Context.prototype.load = function(bits, addressReg, offset, into, signedLoad)
 	{
 		if (bits === undefined || addressReg === undefined || offset === undefined || into === undefined)
 			this.panic("undefined argument");
 		
-		var address = gpr(addressReg);
+		var address = this.gpr(addressReg);
+		if (isKnown(address))
+			address = Recompiler.unsign(address);
+		
 		offset = signExt(offset, 16);
 		address += " + " + offset;
 		
+		this.gprValues[into] = null;
 		if (signedLoad)
 		{
 			var shift = 32 - bits;
-			return gpr(into) + " = (this.memory.read" + bits + "(" + address + ") << " + shift + ") >> " + shift + ";\n";
+			return this.lgpr(into) + " = (this.memory.read" + bits + "(" + address + ") << " + shift + ") >> " + shift + ";\n";
 		}
 		else
 		{
-			return gpr(into) + " = this.memory.read" + bits + "(" + address + ");\n";
+			return this.lgpr(into) + " = this.memory.read" + bits + "(" + address + ");\n";
 		}
 	}
 	
-	function store(bits, addressReg, offset, value)
+	Recompiler.Context.prototype.store = function(bits, addressReg, offset, value)
 	{
 		if (bits === undefined || addressReg === undefined || offset === undefined || value === undefined)
 			this.panic("undefined argument");
 		
-		var address = gpr(addressReg);
+		var address = this.gpr(addressReg);
+		if (isKnown(address))
+			address = Recompiler.unsign(address);
+		
 		offset = signExt(offset, 16);
 		address += " + " + offset;
 		
-		var jsCode = "this.memory.write" + bits + "(" + address + ", " + gpr(value) + ");\n";
+		var jsCode = "this.memory.write" + bits + "(" + address + ", " + this.gpr(value) + ");\n";
 		jsCode += "this.invalidate(" + address + ");\n";
 		return jsCode;
 	}
 	
-	function delaySlot()
+	Recompiler.Context.prototype.delaySlot = function()
 	{
 		this.isDelaySlot = true;
 		try
 		{
-			var delaySlotAddress = this.address;
-			var delaySlot = this.nextInstruction();
+			var delaySlotAddress = this.address + 4;
+			var instruction = this.memory.read32(delaySlotAddress);
+			var delaySlot = Disassembler.getOpcode(instruction);
 			if (delaySlot.instruction.name[0] == 'b' || delaySlot.instruction.name[0] == 'j')
-				return "this.panic('branch in delay slot is undefined behavior', " + (this.address - 4) + ");\n";
+				return "this.panic('branch in delay slot is undefined behavior', " + delaySlotAddress + ");\n";
 			
 			var jsCode = "// delay slot:\n";
 			jsCode += this.recompileOpcode(delaySlotAddress, delaySlot);
@@ -455,14 +463,14 @@ Recompiler.formatHex = function(address, length)
 		}
 	}
 	
-	function branch(condition, offset)
+	Recompiler.Context.prototype.branch = function(condition, offset)
 	{
-		var opAddress = this.address;
+		var opAddress = this.address + 4;
 		var targetAddress = Recompiler.unsign(opAddress + (signExt(offset, 16) << 2));
-		this.addLabel(targetAddress, opAddress);
 		
 		var jsCode = "if (" + condition + ") {\n";
-		jsCode += delaySlot.call(this);
+		jsCode += this.delaySlot();
+		jsCode += this.flushRegisters(false);
 		jsCode += "pc = " + hex(targetAddress) + ";\n";
 		jsCode += "break;\n";
 		jsCode += "}\n";
@@ -471,28 +479,34 @@ Recompiler.formatHex = function(address, length)
 		return jsCode;
 	}
 	
+	//  ----
+	function impl(inst, func)
+	{
+		Recompiler.Context.prototype[inst] = func;
+	}
+	
 	impl("add", function(s, t, d) {
-		return binaryOpTrap(this.address - 4, "+", d, s, gpr(t));
+		return this.binaryOpTrap(this.address - 4, "+", d, s, this.gpr(t));
 	});
 	
 	impl("addi", function(s, t, i) {
-		return binaryOpTrap(this.address - 4, "+", t, s, signExt(i, 16));
+		return this.binaryOpTrap(this.address - 4, "+", t, s, signExt(i, 16));
 	});
 	
 	impl("addiu", function(s, t, i) {
-		return binaryOp("+", t, s, signExt(i, 16));
+		return this.binaryOp("+", t, s, signExt(i, 16));
 	});
 	
 	impl("addu", function(s, t, d) {
-		return binaryOp("+", d, s, gpr(t));
+		return this.binaryOp("+", d, s, this.gpr(t));
 	});
 	
 	impl("and", function(s, t, d) {
-		return binaryOp("&", d, s, gpr(t));
+		return this.binaryOp("&", d, s, this.gpr(t));
 	});
 	
 	impl("andi", function(s, t, i) {
-		return binaryOp("&", t, s, hex(i));
+		return this.binaryOp("&", t, s, hex(i));
 	});
 	
 	impl("avsz3", function() {
@@ -506,7 +520,7 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("beq", function(s, t, i) {
-		return branch.call(this, gpr(s) + " == " + gpr(t), i);
+		return this.branch(this.gpr(s) + " == " + this.gpr(t), i);
 	});
 	
 	impl("beql", function() {
@@ -515,7 +529,7 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("bgez", function(s, i) {
-		return branch.call(this, sign(gpr(s)) + " >= 0", i);
+		return this.branch(sign(this.gpr(s)) + " >= 0", i);
 	});
 	
 	impl("bgezal", function() {
@@ -524,15 +538,15 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("bgtz", function(s, i) {
-		return branch.call(this, sign(gpr(s)) + " > 0", i);
+		return this.branch(sign(this.gpr(s)) + " > 0", i);
 	});
 	
 	impl("blez", function(s, i) {
-		return branch.call(this, sign(gpr(s)) + " <= 0", i);
+		return this.branch(sign(this.gpr(s)) + " <= 0", i);
 	});
 	
 	impl("bltz", function(s, i) {
-		return branch.call(this, sign(gpr(s)) + " < 0", i);
+		return this.branch(sign(this.gpr(s)) + " < 0", i);
 	});
 	
 	impl("bltzal", function() {
@@ -541,7 +555,7 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("bne", function(s, t, i) {
-		return branch.call(this, gpr(s) + " != " + gpr(t), i);
+		return this.branch(this.gpr(s) + " != " + this.gpr(t), i);
 	});
 	
 	impl("break", function() {
@@ -584,15 +598,41 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("div", function(s, t) {
-		var jsCode = "this.gpr[32] = " + sign(gpr(s)) + " % " + sign(gpr(t)) + ";\n";
-		jsCode += "this.gpr[33] = " + sign(gpr(s)) + " / " + sign(gpr(t)) + ";\n";
-		return jsCode;
+		var sVal = this.gpr(s);
+		var tVal = this.gpr(t);
+		if (isKnown(sVal) && isKnown(tVal))
+		{
+			sVal |= 0;
+			tVal |= 0;
+			this.gprValues[32] = sVal % tVal;
+			this.gprValues[33] = sVal / tVal;
+			return;
+		}
+		else
+		{
+			var jsCode = "this.gpr[32] = " + sign(this.gpr(s)) + " % " + sign(this.gpr(t)) + ";\n";
+			jsCode += "this.gpr[33] = " + sign(this.gpr(s)) + " / " + sign(this.gpr(t)) + ";\n";
+			return jsCode;
+		}
 	});
 	
 	impl("divu", function(s, t) {
-		var jsCode = "this.gpr[32] = " + gpr(s) + " % " + gpr(t) + ";\n";
-		jsCode += "this.gpr[33] = " + gpr(s) + " / " + gpr(t) + ";\n";
-		return jsCode;
+		var sVal = this.gpr(s);
+		var tVal = this.gpr(t);
+		if (isKnown(sVal) && isKnown(tVal))
+		{
+			sVal = Recompiler.unsign(sVal);
+			tVal = Recompiler.unsign(tVal);
+			this.gprValues[32] = sVal % tVal;
+			this.gprValues[33] = sVal / tVal;
+			return;
+		}
+		else
+		{
+			var jsCode = "this.gpr[32] = " + this.gpr(s) + " % " + this.gpr(t) + ";\n";
+			jsCode += "this.gpr[33] = " + this.gpr(s) + " / " + this.gpr(t) + ";\n";
+			return jsCode;
+		}
 	});
 	
 	impl("dpcs", function() {
@@ -623,54 +663,60 @@ Recompiler.formatHex = function(address, length)
 	impl("j", function(i) {
 		var opAddress = this.address - 4;
 		var jumpAddress = Recompiler.unsign((opAddress & 0xF0000000) | (i << 2));
-		return delaySlot.call(this) + "return " + hex(jumpAddress) + ";\n";
+		var jsCode = this.delaySlot();
+		jsCode += this.flushRegisters();
+		jsCode += "return " + hex(jumpAddress) + ";\n";
+		return jsCode;
 	});
 	
 	impl("jal", function(i) {
 		var jumpAddress = ((this.address - 4) & 0xF0000000) | (i << 2);
 		
-		var jsCode = delaySlot.call(this);
-		jsCode += gpr(31) + " = " + hex(this.address) + ";\n";
+		var jsCode = this.delaySlot();
+		jsCode += this.flushRegisters();
+		jsCode += this.lgpr(31) + " = " + hex(this.address) + ";\n";
 		jsCode += "return " + hex(jumpAddress) + ";\n";
 		
 		return jsCode;
 	});
 	
 	impl("jalr", function(s, d) {
-		var jsCode = delaySlot.call(this);
-		jsCode += gpr(d) + " = " + hex(this.address) + ";\n"
-		jsCode += "return " + gpr(s) + ";\n";
-		
-		this.addLabel(this.address);
+		var jsCode = this.delaySlot();
+		jsCode += this.flushRegisters();
+		jsCode += this.lgpr(d) + " = " + hex(this.address) + ";\n"
+		jsCode += "return " + this.gpr(s) + ";\n";
 		return jsCode;
 	});
 	
 	impl("jr", function(s) {
-		return delaySlot.call(this) + "return " + gpr(s) + ";\n";
+		var jsCode = this.delaySlot();
+		jsCode += this.flushRegisters();
+		jsCode += "return " + this.gpr(s) + ";\n";
+		return jsCode;
 	});
 	
 	impl("lb", function(s, t, i) {
-		return load(8, s, i, t, true);
+		return this.load(8, s, i, t, true);
 	});
 	
 	impl("lbu", function(s, t, i) {
-		return load(8, s, i, t, false);
+		return this.load(8, s, i, t, false);
 	});
 	
 	impl("lh", function(s, t, i) {
-		return load(16, s, i, t, true);
+		return this.load(16, s, i, t, true);
 	});
 	
 	impl("lhu", function(s, t, i) {
-		return load(16, s, i, t, false);
+		return this.load(16, s, i, t, false);
 	});
 	
 	impl("lui", function(t, i) {
-		return gpr(t) + " = " + hex(i << 16) + ";\n";
+		this.gprValues[t] = i << 16;
 	});
 	
 	impl("lw", function(s, t, i) {
-		return load(32, s, i, t);
+		return this.load(32, s, i, t);
 	});
 	
 	impl("lwc2", function() {
@@ -689,7 +735,8 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("mfc0", function(t, l) { // t is the gpr, l is the cop0 reg
-		return gpr(t) + " = this.cop0_reg[" + l + "];\n";
+		this.gprValues[t] = null;
+		return this.lgpr(t) + " = this.cop0_reg[" + l + "];\n";
 	});
 	
 	impl("mfc2", function() {
@@ -698,15 +745,29 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("mfhi", function(d) {
-		return gpr(d) + " = " + gpr(32) + ";\n";
+		var hi = this.gpr(32);
+		if (isKnown(hi))
+			this.gprValues[d] = hi;
+		else
+		{
+			this.gprValues[d] = null;
+			return this.lgpr(d) + " = " + hi + ";\n";
+		}
 	});
 	
 	impl("mflo", function(d) {
-		return gpr(d) + " = " + gpr(33) + ";\n";
+		var lo = this.gpr(33);
+		if (isKnown(lo))
+			this.gpr[d] = lo;
+		else
+		{
+			this.gprValues[d] = null;
+			return this.lgpr(d) + " = " + lo + ";\n";
+		}
 	});
 	
 	impl("mtc0", function(t, l) {
-		return "this.writeCOP0(" + l + ", " + gpr(t) + ");\n";
+		return "this.writeCOP0(" + l + ", " + this.gpr(t) + ");\n";
 	});
 	
 	impl("mtc2", function() {
@@ -715,11 +776,25 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("mthi", function(d) {
-		return gpr(32) + " = " + gpr(d) + ";\n";
+		var dValue = this.gpr(d);
+		if (isKnown(dValue))
+			this.gprValues[32] = dValue;
+		else
+		{
+			this.gprValues[d] = null;
+			return this.lgpr(32) + " = " + dValue + ";\n";
+		}
 	});
 	
 	impl("mtlo", function(d) {
-		return gpr(33) + " = " + gpr(d) + ";\n";
+		var dValue = this.gpr(d);
+		if (isKnown(dValue))
+			this.gprValues[33] = dValue;
+		else
+		{
+			this.gprValues[d] = null;
+			return this.lgpr(33) + " = " + dValue + ";\n";
+		}
 	});
 	
 	impl("mult", function() {
@@ -728,7 +803,16 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("multu", function(s, t) {
-		return "R3000a.runtime.multu(this.gpr, " + gpr(t) + ", " + gpr(s) + ");\n";
+		var sValue = this.gpr(s);
+		var tValue = this.gpr(t);
+		if (isKnown(sValue) && isKnown(tValue))
+			R3000a.runtime.multu(this.gprValues, sValue, tValue);
+		else
+		{
+			this.gprValues[32] = null;
+			this.gprValues[33] = null;
+			return "R3000a.runtime.multu(this.gpr, " + this.gpr(t) + ", " + this.gpr(s) + ");\n";
+		}
 	});
 	
 	impl("mvmva", function() {
@@ -772,16 +856,23 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("nor", function(s, t, d) {
-		if (d == 0) return ";\n";
-		return gpr(d) + " = ~(" + gpr(s) + " | " + gpr(t) + ");\n";
+		var sValue = this.gpr(s);
+		var tValue = this.gpr(t);
+		if (isKnown(sValue) && isKnown(tValue))
+			this.gprValues[d] = ~(sValue | tValue);
+		else
+		{
+			this.gprValues[d] = null;
+			return this.lgpr(d) + " = ~(" + this.gpr(s) + " | " + this.gpr(t) + ");\n";
+		}
 	});
 	
 	impl("or", function(s, t, d) {
-		return binaryOp("|", d, s, gpr(t));
+		return this.binaryOp("|", d, s, this.gpr(t));
 	});
 	
 	impl("ori", function(s, t, i) {
-		return binaryOp("|", t, s, hex(i));
+		return this.binaryOp("|", t, s, hex(i));
 	});
 	
 	impl("rfe", function() {
@@ -799,35 +890,65 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("sb", function(s, t, i) {
-		return store(8, s, i, t);
+		return this.store(8, s, i, t);
 	});
 	
 	impl("sh", function(s, t, i) {
-		return store(16, s, i, t);
+		return this.store(16, s, i, t);
 	});
 	
 	impl("sll", function(t, d, i) {
-		return binaryOp("<<", d, t, hex(i));
+		return this.binaryOp("<<", d, t, hex(i));
 	});
 	
 	impl("sllv", function(s, t, d) {
-		return binaryOp("<<", d, t, gpr(s));
+		return this.binaryOp("<<", d, t, this.gpr(s));
 	});
 	
 	impl("slt", function(s, t, d) {
-		return gpr(d) + " = " + sign(gpr(s)) + " < " + sign(gpr(t)) + ";\n";
+		var sValue = this.gpr(s);
+		var tValue = this.gpr(t);
+		if (isKnown(sValue) && isKnown(tValue))
+			this.gprValues[d] = ((sValue | 0) < (tValue | 0)) | 0;
+		else
+		{
+			this.gprValues[d] = null;
+			return this.lgpr(d) + " = " + sign(this.gpr(s)) + " < " + sign(this.gpr(t)) + ";\n";
+		}
 	});
 	
 	impl("slti", function(s, t, i) {
-		return gpr(t) + " = " + gpr(s) + " < " + signExt(i, 16) + ";\n";
+		var sValue = this.gpr(s);
+		if (isKnown(sValue) && isKnown(tValue))
+			this.gprValues[t] = ((sValue | 0) < signExt(i, 16)) | 0;
+		else
+		{
+			this.gprValues[t] = null;
+			return this.lgpr(t) + " = " + sign(this.gpr(s)) + " < " + signExt(i, 16) + ";\n";
+		}
 	});
 	
 	impl("sltiu", function(s, t, i) {
-		return gpr(t) + " = " + gpr(s) + " < " + i + ";\n";
+		var sValue = this.gpr(s);
+		if (isKnown(sValue) && isKnown(tValue))
+			this.gprValues[t] = (Recompiler.unsign(sValue) < i) | 0;
+		else
+		{
+			this.gprValues[t] = null;
+			return this.lgpr(t) + " = " + this.gpr(s) + " < " + i + ";\n";
+		}
 	});
 	
 	impl("sltu", function(s, t, d) {
-		return gpr(d) + " = " + gpr(s) + " < " + gpr(t) + ";\n";
+		var sValue = this.gpr(s);
+		var tValue = this.gpr(t);
+		if (isKnown(sValue) && isKnown(tValue))
+			this.gprValues[d] = (Recompiler.unsign(sValue) < Recompiler.unsign(tValue)) | 0;
+		else
+		{
+			this.gprValues[d] = null;
+			return this.lgpr(d) + " = " + this.gpr(s) + " < " + this.gpr(t) + ";\n";
+		}
 	});
 	
 	impl("sqr", function() {
@@ -836,19 +957,19 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("sra", function(t, d, i) {
-		return binaryOp(">>", d, t, i);
+		return this.binaryOp(">>", d, t, i);
 	});
 	
 	impl("srav", function(s, t, d) {
-		return binaryOp(">>", d, t, gpr(s));
+		return this.binaryOp(">>", d, t, this.gpr(s));
 	});
 	
 	impl("srl", function(t, d, i) {
-		return binaryOp(">>>", d, t, i);
+		return this.binaryOp(">>>", d, t, i);
 	});
 	
 	impl("srlv", function(s, t, d) {
-		return binaryOp(">>>", d, t, gpr(s));
+		return this.binaryOp(">>>", d, t, this.gpr(s));
 	});
 	
 	impl("sub", function() {
@@ -857,11 +978,11 @@ Recompiler.formatHex = function(address, length)
 	});
 	
 	impl("subu", function(s, t, d) {
-		return binaryOp("-", d, s, gpr(t));
+		return this.binaryOp("-", d, s, this.gpr(t));
 	});
 	
 	impl("sw", function(s, t, i) {
-		return store(32, s, i, t);
+		return this.store(32, s, i, t);
 	});
 	
 	impl("swc2", function() {
