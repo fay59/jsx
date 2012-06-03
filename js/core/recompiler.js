@@ -42,8 +42,12 @@ Recompiler.prototype.recompileFunction = function(memory, startAddress)
 			keepGoing = op.instruction.name[0] != "j";
 			if (op.instruction.name[0] == 'b' || !keepGoing)
 			{
-				jsCode += "this.clock(" + ((address - lastTick) >>> 2) + ");\n";
-				lastTick = address;
+				var cycles = (address - lastTick) >>> 2;
+				if (cycles > 0)
+				{
+					jsCode += "this.clock(" + cycles + ");\n";
+					lastTick = address;
+				}
 			}
 			
 			var injectedBefore = this._injectBefore(address, op, this.isDelaySlot);
@@ -280,7 +284,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 		var self = this;
 		function addToAddresses(addr)
 		{
-			if (self.labels.indexOf(addr) == -1)
+			if (self.labels.indexOf(addr) == -1 && addressesToCompile.indexOf(addr) == -1)
 				addressesToCompile.push(addr);
 		}
 		
@@ -298,9 +302,17 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 				visitedAddresses[address] = true;
 				
 				var op = Disassembler.getOpcode(instruction);
-				if (op.instruction.name == "j" || op.instruction.name == "jr")
+				if (op.instruction.name == "j" || op.instruction.name == "jr" || op.instruction.name == "break")
 				{
 					break;
+				}
+				else if (op.instruction.name.substr(0, 3) == "jal")
+				{
+					addToAddresses(address + 8);
+				}
+				else if (op.instruction.name == "syscall")
+				{
+					addToAddresses(address + 4);
 				}
 				else if (op.instruction.name[0] == "b")
 				{
@@ -410,6 +422,9 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	{
 		if (bits === undefined || addressReg === undefined || offset === undefined || into === undefined)
 			this.panic("undefined argument");
+		
+		if (into == 0) // don't write to r0
+			return;
 		
 		var address = this.gpr(addressReg);
 		if (isKnown(address))
@@ -677,11 +692,11 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	});
 	
 	impl("jal", function(i) {
-		var jumpAddress = ((this.address - 4) & 0xF0000000) | (i << 2);
+		var jumpAddress = (this.address & 0xF0000000) | (i << 2);
 		
 		var jsCode = this.delaySlot();
 		jsCode += this.flushRegisters();
-		jsCode += this.lgpr(31) + " = " + hex(this.address) + ";\n";
+		jsCode += this.lgpr(31) + " = " + hex(this.address + 4) + ";\n";
 		jsCode += "return " + hex(jumpAddress) + ";\n";
 		
 		return jsCode;
@@ -690,7 +705,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	impl("jalr", function(s, d) {
 		var jsCode = this.delaySlot();
 		jsCode += this.flushRegisters();
-		jsCode += this.lgpr(d) + " = " + hex(this.address) + ";\n"
+		jsCode += this.lgpr(d) + " = " + hex(this.address + 4) + ";\n"
 		jsCode += "return " + this.gpr(s) + ";\n";
 		return jsCode;
 	});
@@ -945,7 +960,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	impl("sltiu", function(s, t, i) {
 		var sValue = this.gpr(s);
 		if (this.optimize && isKnown(sValue) && isKnown(tValue))
-			this.setReg(t, (Recompiler.unsign(sValue) < i) | 0);
+			this.setReg(t, (sValue < Recompiler.unsign(signExt(i, 16))) | 0);
 		else
 		{
 			this.setReg(t, null);

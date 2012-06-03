@@ -20,6 +20,11 @@ GPU.prototype.reset = function()
 	this.status = 0x14802000;
 }
 
+GPU.prototype.vBlank = function()
+{
+	this.psx.diags.warn("GPU should update vblank");
+}
+
 GPU.prototype.updateLace = function()
 {
 	this.psx.diags.warn("GPU should update lace");

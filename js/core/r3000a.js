@@ -19,16 +19,13 @@ var R3000a = function(psx)
 	this.memory = null;
 	this.cycles = 0;
 	
-	// GPRs, COP0 registers, COP2 data registers, COP2 control registers
-	this.registerMemory = new ArrayBuffer((34 * 4) + (16 * 4) + (32 * 4) + (32 * 4));
-	
 	// hi, lo in 32, 33 respectively
-	this.gpr = new Uint32Array(this.registerMemory, 0, 34); // general purpose registers
-	this.cop0_reg = new Uint32Array(this.registerMemory, 34 * 4, 16); // status registers
+	this.cop0_reg = new Uint32Array(16); // status registers
+	this.gpr = new Uint32Array(34); // general purpose registers
 	
 	// no fancy structures like PCSX has because nothing uses them
-	this.cop2_data = new Uint32Array(this.registerMemory, (34 + 16) * 4, 32);
-	this.cop2_ctl = new Uint32Array(this.registerMemory, (34 + 16 + 32) * 4, 32);
+	this.cop2_data = new Uint32Array(32);
+	this.cop2_ctl = new Uint32Array(32);
 }
 
 R3000a.bootAddress = 0xbfc00000;

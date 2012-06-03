@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", including.bind(null,
 	"js/core/disasm.js", "js/core/r3000a.js", "js/core/compiled.js", "js/core/hwregs.js",
-	"js/core/parallel.js", "js/core/memory.js", "js/core/recompiler.js", "js/core/asm.js",
-	"js/core/mdec.js", "js/core/gpu.js", "js/core/spu.js", "js/core/psx.js", function()
+	"js/core/parallel.js", "js/core/memory.js", "js/core/recompiler.js", "js/core/recompiler-old.js", "js/core/asm.js",
+	"js/core/mdec.js", "js/core/gpu.js", "js/core/spu.js", "js/core/counters.js", "js/core/psx.js", function()
 	{
 	document.querySelector("#bios").addEventListener("change", function()
 	{
@@ -11,14 +11,18 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 			window.psx = new PSX(console, null, reader.result, [], []);
 			window.psx.reset();
 			
+			if (document.querySelector("#old-rec").checked)
+				window.psx.memory.compiled.recompiler = new OldRecompiler();
+			
 			try
 			{
 				var now = new Date();
 				window.psx.runFrame();
-				document.querySelector("#crash").textContent = (new Date() - now) / 1000 + " seconds";
+				var finish = new Date();
 			}
 			catch (e)
 			{
+				var finish = new Date();
 				console.error(e);
 				document.querySelector("#crash").textContent = e.toString();
 				
@@ -64,6 +68,7 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 				}
 				document.querySelector("#missing-count").textContent = totalUnimplemented + "/" + totalJitted;
 			}
+			document.querySelector("#crash").textContent += "; " + (finish - now) / 1000 + " seconds";
 		}
 		
 		reader.readAsArrayBuffer(this.files[0]);

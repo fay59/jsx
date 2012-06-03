@@ -32,110 +32,6 @@ DMARegisters.prototype.wire = function(hwregs, address, action)
 	);
 }
 
-var Counter = function(psx, count, target, mode, rate, interrupt)
-{
-	this.psx = psx;
-	
-	this.count = 0;
-	this.target = 0;
-	this.mode = 0;
-	
-	this.startCycle = 0;
-	this.targetCycle = 0;
-	this.rate = 0;
-	this.interrupt = 0;
-}
-
-Counter.baseRateShift = 1;
-
-Counter.prototype.wire = function(hwregs, address)
-{
-	var self = this;
-	hwregs.wire(address,
-		function() { return self.readCount(); },
-		function(value) { self.writeCount(value); }
-	);
-	
-	hwregs.wire(address + 4,
-		function() { return self.mode; },
-		function(value) { self.writeMode(value); }
-	);
-	
-	hwregs.wire(address + 8,
-		function() { return self.target; },
-		function(value) { self.writeTarget(value); }
-	);
-}
-
-Counter.prototype.readCount = function()
-{
-	var cycles = this.mode & 0x80
-		? (this.psx.cycles - this.startCycle)
-		: this.psx.cycles;
-	return (this.count + 2 * cycles / this.rate) & 0xffff;
-}
-
-Counter.prototype.writeCount = function(value)
-{
-	this.count = value & 0xffff;
-	this.updateTargetCycle();
-}
-
-Counter.prototype.writeTarget = function(value)
-{
-	this.target = value;
-	this.updateTargetCycle();
-}
-
-Counter.prototype.writeMode = function(value)
-{
-	this.mode = value;
-	this.count = 0;
-	this.updateRate();
-	this.updateTargetCycle();
-}
-
-Counter.prototype.updateRate = function()
-{
-	// default implementation does nothing
-}
-
-Counter.prototype.updateTargetCycle = function(startCycle)
-{
-	this.startCycle = this.psx.cpu.cycles;
-	if (this.mode & 0x30)
-	{
-		var target = (this.mode & 0x10) ? this.target : 0xffff;
-		this.targetCycle = ((target - this.count) * this.rate) >>> Counter.baseRateShift;
-	}
-	else
-	{
-		this.targetCycle = Infinity;
-	}
-}
-
-Counter.prototype.test = function()
-{
-	if (this.psx.cpu.cycles - this.startCycle >= this.targetCycle)
-	{
-		this.reset();
-		return true;
-	}
-	return false;
-}
-
-Counter.prototype.reset = function()
-{
-	this.count = 0;
-	this.updateTargetCycle();
-	
-	var translated = this.psx.memory.translate(0x1f801070);
-	translated.buffer[translated.offset] |= this.interrupt;
-	
-	if ((this.mode & 0x40) == 0) // 0x40: do not repeat
-		this.targetCycle = Infinity;
-}
-
 var HardwareRegisters = function(psx)
 {
 	this.psx = psx;
@@ -143,22 +39,26 @@ var HardwareRegisters = function(psx)
 	this.unknownReads = {};
 	this.unknownWrites = {};
 	
+	this.counters = new Counters(psx);
+	
 	this.u8 = {length: 0x2000};
 	this.u16 = {length: 0x2000 >> 1};
 	this.u32 = {length: 0x2000 >> 2};
 	
-	this._createCounters();
-	this._attachDevices.apply(this, Array.prototype.slice.call(arguments, 1));
+	var devices = Array.prototype.slice.call(arguments, 1);
+	devices.push(this.counters);
+	this._attachDevices.apply(this, devices);
+}
+
+HardwareRegisters.prototype.setIrq = function(irq)
+{
+	this.u32[0x1070 >> 2] |= irq;
 }
 
 HardwareRegisters.prototype.update = function()
 {
-	var counterOrder = [3, 0, 1, 2];
-	for (var i = 0; i < counterOrder.length; i++)
-	{
-		var counter = this.counters[counterOrder[i]];
-		counter.test();
-	}
+	if (this.psx.cpu.cycles - this.counters.assumedStart >= this.counters.nextTarget)
+		this.counters.update();
 }
 
 HardwareRegisters.prototype.wire = function(address, getter, setter)
@@ -174,6 +74,8 @@ HardwareRegisters.prototype.wire = function(address, getter, setter)
 	this.u16.__defineGetter__((address >>> 1) + 1, function() { return getter() >>> 16; });
 	this.u16.__defineSetter__(address >>> 1, function(value) { setter((getter() & 0xffff0000) | value); });
 	this.u16.__defineSetter__((address >>> 1) + 1, function(value) { setter((getter() & 0xffff) | (value << 16)); });
+	
+	// TODO attacher sur les u8
 }
 
 HardwareRegisters.prototype.wire16 = function(address, getter, setter)
@@ -194,6 +96,8 @@ HardwareRegisters.prototype.wire16 = function(address, getter, setter)
 	
 	this.u16.__defineGetter__(address16, getter);
 	this.u16.__defineSetter__(address16, setter);
+	
+	// TODO attacher sur les u8
 }
 
 HardwareRegisters.unimplementedRegisters = [
@@ -209,79 +113,6 @@ HardwareRegisters.unimplementedRegisters = [
 	// SPU
 	0x1f801da6, 0x1f801da8, 0x1f801daa, 0x1f801dac, 0x1f801dae
 ];
-
-HardwareRegisters.prototype._createCounters = function()
-{
-	var psx = this.psx;
-	this.counters = [
-		new Counter(psx, 0, 0, 0, 1, 0x10),
-		new Counter(psx, 0, 0, 0, 1, 0x20),
-		new Counter(psx, 0, 0, 0, 1, 0x40),
-		new Counter(psx, 0, 1, 0x58, 0, 0x01)
-	];
-	
-	var vsyncCounter = this.counters[3];
-	vsyncCounter.rate = Math.floor(R3000a.cyclesPerSecond / psx.framesPerSecond);
-	vsyncCounter.rate -= Math.floor(vsyncCounter.rate / 262) * 22;
-	
-	// override vsyncCounter's update function to trigger GPU-related stuff
-	vsyncCounter.test = function()
-	{
-		if (Counter.prototype.test.call(this))
-		{
-			if (this.mode & 0x10000)
-			{
-				this.psx.gpu.updateLace();
-				this.psx.cpu.yield();
-			}
-			else
-			{
-				var translated = this.psx.memory.translate(0x1f801070);
-				translated.buffer[translated.offset] |= 1;
-			}
-			this.mode ^= 0x10000;
-		}
-	}
-	
-	// override counter 2's start function: LSB must be set
-	this.counters[2].updateTargetCycle = function()
-	{
-		this.startCycle = this.psx.cpu.cycles;
-		if ((this.mode & 0x01) && (this.mode & 0x30))
-		{
-			var target = (this.mode & 0x10) ? this.target : 0xffff;
-			this.cycles = ((target - this.count) * this.rate) >>> Counter.baseRateShift;
-		}
-		else
-		{
-			this.cycles = 0xffffffff;
-		}
-	}
-	
-	// override updateRate
-	this.counters[0].updateRate = function()
-	{
-		this.rate = (this.mode & 0x300) == 0x100
-			? vsyncCounter.rate / 386 / 262
-			: 1;
-	}
-	
-	this.counters[1].updateRate = function()
-	{
-		this.rate = (this.mode & 0x300) == 0x100
-			? vsyncCounter.rate / 262
-			: 1;
-	}
-	
-	this.counters[1].updateRate = function()
-	{
-		this.rate = (this.mode & 0x300) == 0x200 ? 8 : 1;
-	}
-	
-	this.counters[0].wire(this, 0x1f801100);
-	this.counters[1].wire(this, 0x1f801110);
-	this.counters[2].wire(this, 0x1f801120);
-}
 
 HardwareRegisters.prototype._attachDevices = function()
 {
