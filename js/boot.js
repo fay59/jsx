@@ -8,7 +8,9 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 		var reader = new FileReader();
 		reader.onload = function()
 		{
-			window.psx = new PSX(console, null, reader.result, [], []);
+			var tv = document.querySelector("#tv");
+			var gl = tv.getContext("experimental-webgl");
+			window.psx = new PSX(console, gl, reader.result, [], []);
 			window.psx.reset();
 			
 			if (document.querySelector("#old-rec").checked)
@@ -17,7 +19,11 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 			try
 			{
 				var now = new Date();
-				window.psx.runFrame();
+				for (var i = 0; i < 5; i++)
+				{
+					console.log("Running frame...");
+					window.psx.runFrame();
+				}
 				var finish = new Date();
 			}
 			catch (e)

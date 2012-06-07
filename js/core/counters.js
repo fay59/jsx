@@ -120,15 +120,9 @@ Counters.prototype.update = function()
 			//	SPU_async(system.spuUpdateInterval * counter.target);
 		}
 		
-		if (this.hsyncCount >= system.vblankStart)
-		{
-			this.psx.gpu.vBlank(1);
-		}
-		
 		if (this.hsyncCount >= system.hsyncTotal)
 		{
 			this.hsyncCount = 0;
-			this.psx.gpu.vBlank(0);
 			this.psx.hardwareRegisters.setIrq(1);
 			this.psx.gpu.updateLace();
 			this.psx.cpu.yield();
