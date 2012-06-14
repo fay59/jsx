@@ -27,8 +27,8 @@ Recompiler.prototype.recompileFunction = function(memory, startAddress)
 		var address = context.labels[i];
 		var nextLabel = i + 1 < context.labels.length
 			? context.labels[i + 1]
-			: 0xFFFFFFFF;
-		var lastTick = address;
+			: 0x100000000; // 0xffffffff + 1
+		var cycles = 0;
 		
 		var keepGoing = true;
 		jsCode += context.flushRegisters();
@@ -39,27 +39,30 @@ Recompiler.prototype.recompileFunction = function(memory, startAddress)
 			var op = Disassembler.getOpcode(pattern);
 			if (op == null) this.panic(pattern, this.address);
 			
-			keepGoing = op.instruction.name[0] != "j";
-			if (op.instruction.name[0] == 'b' || !keepGoing)
-			{
-				var cycles = (address - lastTick) >>> 2;
-				if (cycles > 0)
-				{
-					jsCode += "this.clock(" + cycles + ");\n";
-					lastTick = address;
-				}
-			}
-			
 			var injectedBefore = this._injectBefore(address, op, this.isDelaySlot);
 			var code = context.recompileOpcode(address, op);
 			var injectedAfter = this._injectAfter(address, op, this.isDelaySlot);
+			
+			cycles += context.cyclesOfLastOperation;
+			keepGoing = op.instruction.name[0] != 'j';
+			if (op.instruction.name[0] == 'b' || !keepGoing)
+			{
+				injectedBefore += "this.clock(" + cycles + ");\n";
+				cycles = 0;
+			}
+			
+			if (code == "")
+				code = "// nop\n";
 			
 			jsCode += injectedBefore + code + injectedAfter;
 			address += 4;
 		}
 		
 		if (address == nextLabel)
-			jsCode += "this.clock(" + ((address - lastTick) >>> 2) + ");\n";
+		{
+			jsCode += "this.clock(" + cycles + ");\n";
+			cycles = 0;
+		}
 		
 		ranges.push([context.labels[i], address]);
 	}
@@ -202,6 +205,7 @@ Recompiler.Context = function(memory, optimize)
 	this.opcodes = {};
 	this.unimplementedInstructionCounts = {};
 	this.jittedInstructions = 0;
+	this.cyclesOfLastOperation = 0;
 	
 	this.memory = memory;
 }
@@ -215,6 +219,15 @@ Recompiler.Context.prototype.recompileOpcode = function(currentAddress, op)
 {
 	this.address = currentAddress;
 	this.jittedInstructions++;
+	
+	if (op.instruction.cycles === undefined)
+		this.panic("Unknown cycle count for " + op.instruction.name);
+	
+	if (this.isDelaySlot)
+		this.cyclesOfLastOperation += op.instruction.cycles;
+	else
+		this.cyclesOfLastOperation = op.instruction.cycles;
+	
 	var instructionCode = this[op.instruction.name].apply(this, op.params);
 
 	if (instructionCode === undefined)
@@ -223,9 +236,8 @@ Recompiler.Context.prototype.recompileOpcode = function(currentAddress, op)
 	var addressString = Recompiler.formatHex(currentAddress);
 	var opcodeString = Disassembler.getOpcodeAsString(op);
 	var commentString = addressString + ": " + opcodeString;
-	var jsComment = "// " + commentString + "\n";
 	
-	return jsComment + instructionCode;
+	return instructionCode;
 }
 
 Recompiler.Context.prototype.countUnimplemented = function(instruction)
@@ -473,9 +485,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 			if (delaySlot.instruction.name[0] == 'b' || delaySlot.instruction.name[0] == 'j')
 				return "this.panic('branch in delay slot is undefined behavior', " + delaySlotAddress + ");\n";
 			
-			var jsCode = "// delay slot:\n";
-			jsCode += this.recompileOpcode(delaySlotAddress, delaySlot);
-			return jsCode;
+			return this.recompileOpcode(delaySlotAddress, delaySlot);
 		}
 		finally
 		{
