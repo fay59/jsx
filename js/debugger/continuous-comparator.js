@@ -1,4 +1,4 @@
-var StateComparator = function(buffer)
+var ContinuousStateComparator = function(buffer)
 {
 	this.instructions = 0;
 	this.arrayStart = 0;
@@ -6,17 +6,17 @@ var StateComparator = function(buffer)
 	this.hits = {};
 }
 
-StateComparator.ComparisonError = function(error)
+ContinuousStateComparator.ComparisonError = function(error)
 {
 	this.message = error;
 }
 
-StateComparator.ComparisonError.prototype.toString = function()
+ContinuousStateComparator.ComparisonError.prototype.toString = function()
 {
 	return "state comparison error: " + this.message;
 }
 
-StateComparator.prototype.reset = function(memory)
+ContinuousStateComparator.prototype.reset = function(memory)
 {
 	var recompiler = memory.compiled.recompiler;
 	var isJump = false;
@@ -54,7 +54,7 @@ StateComparator.prototype.reset = function(memory)
 	});
 }
 
-StateComparator.prototype.compare = function(pc, cpu)
+ContinuousStateComparator.prototype.compare = function(pc, cpu)
 {
 	// pc, changes, gprValue, cop0Values[4]
 	if (this.hits[pc] === undefined) this.hits[pc] = 0;
@@ -90,7 +90,7 @@ StateComparator.prototype.compare = function(pc, cpu)
 		var message = "program counter does not match after ";
 		message += this.instructions + " instructions ";
 		message += "(after " + this.hits[pc] + " hits)";
-		throw new StateComparator.ComparisonError(message);
+		throw new ContinuousStateComparator.ComparisonError(message);
 	}
 	
 	if (cpu.gpr[changedGPR] != gprValue)
@@ -99,7 +99,7 @@ StateComparator.prototype.compare = function(pc, cpu)
 		message += "GRP " + changedGPR + " should be " + gprValue.toString(16) + " ";
 		message += "but it's " + cpu.gpr[changedGPR].toString(16) + " ";
 		message += "(after " + this.hits[pc] + " hits)";
-		throw new StateComparator.ComparisonError(message);
+		throw new ContinuousStateComparator.ComparisonError(message);
 	}
 	
 	for (var key in changedCOP0)
@@ -111,7 +111,7 @@ StateComparator.prototype.compare = function(pc, cpu)
 			message += "COP0 register " + key + " should be " + changeValue.toString(16) + " ";
 			message += "but it's " + cpu.cop0_reg[key].toString(16) + " ";
 			message += "(after " + this.hits[pc] + " hits)";
-			throw new StateComparator.ComparisonError(message);
+			throw new ContinuousStateComparator.ComparisonError(message);
 		}
 	}
 }

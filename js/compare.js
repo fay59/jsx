@@ -1,7 +1,10 @@
 document.addEventListener("DOMContentLoaded", including.bind(null,
 	"js/core/disasm.js", "js/core/r3000a.js", "js/core/compiled.js", "js/core/hwregs.js",
-	"js/core/parallel.js", "js/core/memory.js", "js/core/recompiler.js", "js/core/asm.js",
-	"js/core/mdec.js", "js/core/gpu.js", "js/debugger/comparator.js", "js/core/psx.js", function()
+	"js/core/parallel.js", "js/core/memory.js", "js/core/recompiler.js",
+	"js/core/recompiler-old.js", "js/core/asm.js", "js/core/mdec.js", "js/core/gpu.js",
+	"js/core/spu.js", "js/core/counters.js", "js/core/psx.js",
+	"js/debugger/branch-comparator.js",
+	function()
 	{
 		var bios = document.querySelector("#bios");
 		var dump = document.querySelector("#dump");
@@ -16,13 +19,15 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 				return;
 			
 			var psx = new PSX(console, null, biosReader.result, [], []);
-			var comparator = new StateComparator(dumpReader.result);
+			var comparator = new BranchComparator(dumpReader.result);
 			psx.reset();
 			comparator.reset(psx.memory);
 			
 			try
 			{
-				psx.cpu.run(R3000a.bootAddress, comparator);
+				var pc = R3000a.bootAddress;
+				while (true)
+					pc = psx.cpu.run(pc, comparator);
 			}
 			catch (e)
 			{

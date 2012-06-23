@@ -169,9 +169,6 @@ R3000a.prototype.clock = function(ticks)
 	this.cycles = (this.cycles >>> 1) * 2 + lastBit;
 	
 	this.psx.hardwareRegisters.update();
-	
-	if (this.cycles > R3000a.cyclesPerSecond)
-		throw new Error("CPU should have interrupted");
 }
 
 R3000a.prototype.run = function(pc, context)

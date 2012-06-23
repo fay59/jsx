@@ -8,7 +8,7 @@ var GPU = function(psx, glContext)
 	
 	this.statusRegValue = 0;
 	this.dataRegValue = 0
-	this.gpuData = new Uint32Array(100);
+	this.data = new Uint32Array(100);
 	this.command = 0;
 	this.dataWriteCount = 0;
 	this.dataWriteIndex = 0;
@@ -136,8 +136,8 @@ GPU.prototype.reset = function()
 	for (var i = 0; i < this.u32.length; i++)
 		this.u32[i] = 0;
 	
-	for (var i = 0; i < this.gpuData.lenght; i++)
-		this.gpuData[i] = 0;
+	for (var i = 0; i < this.data.length; i++)
+		this.data[i] = 0;
 	
 	with (this.display)
 	{
@@ -282,7 +282,7 @@ GPU.prototype.writeDataRegister = function(value)
 	if (this.dataWriteCount == 0)
 	{
 		var command = (value >> 24) & 0xff;
-		if (GPU.primitiveTable[command])
+		if (GPU.primitiveSizeTable[command])
 		{
 			this.dataWriteCount = GPU.primitiveSizeTable[command];
 			this.command = command;

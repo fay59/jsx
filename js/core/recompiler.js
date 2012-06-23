@@ -17,6 +17,7 @@ Recompiler.prototype.recompileFunction = function(memory, startAddress)
 	jsCode += "while (true) {\n";
 	jsCode += "var interruptPC = this.checkInterrupts(pc);\n";
 	jsCode += "if (interruptPC !== undefined) return interruptPC;\n";
+	jsCode += this._injectAfterBranch();
 	jsCode += "switch (pc) {\n";
 	
 	var optimize = this.tryToOptimize && this.injectors.length == 0;
@@ -153,6 +154,11 @@ Recompiler.prototype._injectAfter = function(address, opcode, isDelaySlot)
 Recompiler.prototype._injectAtLabel = function(address)
 {
 	return this._injectCallback("injectBeforeLabel", address);
+}
+
+Recompiler.prototype._injectAfterBranch = function(address)
+{
+	return this._injectCallback("injectAfterBranch", address);
 }
 
 Recompiler.prototype._injectCallback = function(fn)

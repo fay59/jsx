@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 			try
 			{
 				var now = new Date();
-				for (var i = 0; i < 5; i++)
+				for (var i = 0; i < 100; i++)
 				{
 					console.log("Running frame...");
 					window.psx.runFrame();
