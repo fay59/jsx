@@ -63,7 +63,7 @@ Counters.prototype.reset = function()
 		var system = this.psx.emulatedSystem;
 		rate = 1;
 		mode = Counter.RcCountToTarget;
-		target = R3000a.cyclesPerSecond / (system.frameRate * system.hsyncTotal);
+		target = Math.floor(R3000a.cyclesPerSecond / (system.frameRate * system.hsyncTotal));
 	}
 	
 	for (var i = 0; i < this.counters.length; i++)

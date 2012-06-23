@@ -24,18 +24,20 @@ PSX.noDiags = {
 	error: function() {}
 };
 
-PSX.PAL = {
+PSX.NTSC = {
 	frameRate: 60,
 	vblankStart: 240,
 	hsyncTotal: 262,
-	spuUpdateInterval: 23
+	spuUpdateInterval: 23,
+	region: "NTSC"
 };
 
-PSX.NTSC = {
+PSX.PAL = {
 	frameRate: 50,
 	vblankStart: 256,
 	hsyncTotal: 312,
-	spuUpdateInterval: 22
+	spuUpdateInterval: 22,
+	region: "PAL"
 };
 
 PSX.prototype.reset = function()
