@@ -254,7 +254,7 @@ GPU.prototype.writeStatusRegister = function(data)
 			return;
 		
 		default:
-			this.psx.diags.error("GPU.writeStatusRegister: unknown command " + command.toString(16));
+			this.psx.diags.error("GPU.writeStatusRegister: unknown command 0x%08x", command);
 			return;
 	}
 }
@@ -292,7 +292,7 @@ GPU.prototype.writeDataRegister = function(value)
 		else
 		{
 			if (value)
-				this.psx.diags.warn("Unknown command " + command + " (data " + value + ")");
+				this.psx.diags.warn("Unknown command 0x%08x (data 0x%08x)", command, value);
 			return;
 		}
 	}
@@ -323,7 +323,7 @@ GPU.prototype.dmaChain = function(baseAddress, offset)
 			var size = GPU.primitiveSizeTable[command];
 			if (size == 0)
 			{
-				this.psx.diags.warn("Unknown command " + command + " in DMA chain");
+				this.psx.diags.warn("Unknown command 0x%08x in DMA chain", command);
 				dmaMemOffset += 4;
 				count--;
 			}

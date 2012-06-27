@@ -249,7 +249,7 @@ Debugger.prototype._handleException = function(ex)
 		this._lastHitBreakpoint = ex.breakpoint;
 		this._lastHitBreakpoint._skipOnce = true;
 		
-		this.diags.log("stopped at " + this.pc);
+		this.diags.log("stopped at 0x%08x", this.pc);
 		this._eventCallback("stepped");
 	}
 	else

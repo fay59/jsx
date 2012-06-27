@@ -52,7 +52,7 @@ var HardwareRegisters = function(psx)
 
 HardwareRegisters.prototype.setIrq = function(irq)
 {
-	this.u32[0x1070 >> 2] |= irq;
+	this.u32[0x70 >> 2] |= irq;
 }
 
 HardwareRegisters.prototype.update = function()
@@ -100,19 +100,21 @@ HardwareRegisters.prototype.wire16 = function(address, getter, setter)
 	// TODO attacher sur les u8
 }
 
-HardwareRegisters.unimplementedRegisters = [
+HardwareRegisters.unimplementedRegistersList = [
 	0x1f801000, 0x1f801004, 0x1f801008, 0x1f80100c, 0x1f801010, 0x1f80101c,
 	0x1f802041, 0x1f801018, 0x1f8016c0, 0x1f8016c2,
 	
 	// interrupts (those don't need special handling)
 	0x1f801070, 0x1f801074,
 	
-	// DMA control register
-	0x1f8010f0,
+	// DMA stuff
+	0x1f8010f0, 0x1f8010f4,
 	
 	// SPU
 	0x1f801da6, 0x1f801da8, 0x1f801daa, 0x1f801dac, 0x1f801dae
 ];
+
+HardwareRegisters.unimplementedRegisters = {};
 
 HardwareRegisters.prototype._attachDevices = function()
 {
@@ -129,14 +131,13 @@ HardwareRegisters.prototype._attachDevices = function()
 	
 	function undef_getter(buffer, index, shift)
 	{
+		var address = 0x1F801000 + index;
 		return function()
 		{
-			var address = 0x1F801000 + index;
-			var strAddress = address.toString(16);
-			if (HardwareRegisters.unimplementedRegisters.indexOf(address) == -1)
+			if (address in HardwareRegisters.unimplementedRegisters)
 			{
 				self.unknownReads[address] = true;
-				self.psx.diags.warn("reading register " + strAddress);
+				self.psx.diags.warn("reading register %x", address);
 			}
 			return buffer[index >>> shift];
 		};
@@ -144,14 +145,13 @@ HardwareRegisters.prototype._attachDevices = function()
 	
 	function undef_setter(buffer, index, shift)
 	{
+		var address = 0x1F801000 + index;
 		return function(value)
 		{
-			var address = 0x1F801000 + index;
-			var strAddress = address.toString(16);
-			if (HardwareRegisters.unimplementedRegisters.indexOf(address) == -1)
+			if (address in HardwareRegisters.unimplementedRegisters)
 			{
 				self.unknownWrites[address] = true;
-				self.psx.diags.warn("writing register " + strAddress + " -> " + value.toString(16));
+				self.psx.diags.warn("writing register %x -> %x", address, value);
 			}
 			buffer[index >>> shift] = value;
 		};
@@ -187,3 +187,12 @@ HardwareRegisters.prototype._attachDevices = function()
 		}
 	}
 }
+
+;(function()
+{
+	for (var i = 0; i < HardwareRegisters.unimplementedRegistersList; i++)
+	{
+		var key = HardwareRegisters.unimplementedRegistersList[i];
+		HardwareRegisters.unimplementedRegisters[key] = true;
+	}
+});

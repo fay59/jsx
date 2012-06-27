@@ -15,6 +15,7 @@ ExecutionException.prototype.toString = function()
 var R3000a = function(psx)
 {
 	this.psx = psx;
+	this.yields = 0;
 	this.shouldYield = false;
 	this.memory = null;
 	this.cycles = 0;
@@ -86,6 +87,7 @@ R3000a.prototype.__crash = function()
 R3000a.prototype.yield = function()
 {
 	this.shouldYield = true;
+	this.yields++;
 }
 
 R3000a.prototype.reset = function()
@@ -110,13 +112,13 @@ R3000a.prototype.reset = function()
 
 R3000a.prototype.checkInterrupts = function(epc)
 {
-	if (this.memory.read32(0x1f801070) & this.memory.read32(0x1f801074))
+	if ((this.cop0_reg[12] & 0x401) == 0x401)
 	{
-		if ((this.cop0_reg[12] & 0x401) == 0x401)
-		{
-			throw new Error("raised interrupt!");
+		// directly read through the hardwareRegisters interface to avoid the function calls
+		var irqs = this.psx.hardwareRegisters.u32[0x70 >> 2]; // 0x1f801070
+		var mask = this.psx.hardwareRegisters.u32[0x74 >> 2]; // 0x1f801074
+		if (irqs & mask)
 			return this.raiseException(epc, 0x400, false);
-		}
 	}
 }
 
@@ -144,7 +146,7 @@ R3000a.prototype.writeCOP0 = function(reg, value)
 	var oldValue = this.cop0_reg[reg];
 	this.cop0_reg[reg] = value;
 	
-	this.psx.diags.log("Writing " + value.toString(16) + " to " + Disassembler.cop0RegisterNames[reg]);
+	this.psx.diags.log("Writing 0x%08x to %s", value, Disassembler.cop0RegisterNames[reg]);
 	
 	switch (reg)
 	{

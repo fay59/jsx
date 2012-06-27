@@ -87,7 +87,7 @@ MotionDecoder.prototype.execDMA0 = function()
 	}
 	else
 	{
-		this.psx.diags.warn("Unknown command " + this.command.toString(16));
+		this.psx.diags.warn("Unknown command 0x%08x", this.command);
 	}
 }
 
