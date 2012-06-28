@@ -36,7 +36,7 @@ Recompiler.prototype.recompileFunction = function(memory, startAddress)
 		jsCode += "case 0x" + Recompiler.formatHex(address) + ":\n";
 		while (keepGoing && address < nextLabel)
 		{
-			var pattern = this.memory.read32(address);
+			var pattern = this.checkedRead32(address);
 			var op = Disassembler.getOpcode(pattern);
 			if (op == null) this.panic(pattern, this.address);
 			
@@ -255,6 +255,17 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 
 ;(function()
 {
+	function checkedRead32(address)
+	{
+		var translated = this.memory.translate(address);
+		if (translated.buffer == MemoryMap.unmapped)
+			this.panic("reading at unmapped location " + hex(address));
+		
+		return translated.buffer.u32[translated.offset >>> 2];
+	}
+	
+	Recompiler.prototype.checkedRead32 = checkedRead32;
+	
 	function isKnown(x)
 	{
 		return x != null && isFinite(x);
@@ -294,6 +305,8 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 		this.known[reg] = value !== null;
 	}
 	
+	Recompiler.Context.prototype.checkedRead32 = checkedRead32;
+	
 	Recompiler.Context.prototype.analyzeBranches = function(startAddress)
 	{
 		var addressesToCompile = [startAddress];
@@ -316,7 +329,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 				if (address in visitedAddresses)
 					break;
 				
-				var instruction = this.memory.read32(address);
+				var instruction = this.checkedRead32(address);
 				visitedAddresses[address] = true;
 				
 				var op = Disassembler.getOpcode(instruction);
@@ -445,21 +458,56 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 			return;
 		
 		var address = this.gpr(addressReg);
-		if (isKnown(address))
-			address = Recompiler.unsign(address);
-		
 		offset = signExt(offset, 16);
-		address += " + " + offset;
-		
-		this.setReg(into, null);
-		if (signedLoad)
+		if (isKnown(address))
 		{
-			var shift = 32 - bits;
-			return this.lgpr(into) + " = (this.memory.read" + bits + "(" + address + ") << " + shift + ") >> " + shift + ";\n";
+			address = Recompiler.unsign(address) + offset;
+			var translated = this.memory.translate(address);
+			if (translated.buffer == MemoryMap.unmapped)
+			{
+				var jsCode = "this.psx.diags.warn(\"reading from unmapped memory address " + hex(address) + " from PC=" + hex(this.address - 4) + "\");\n";
+				jsCode += this.lgpr(into) + " = 0;\n";
+				return jsCode;
+			}
+			else
+			{
+				var zoneName = translated.buffer.zoneName;
+				var offsetShift = bits >>> 4;
+				var reference = "this.memory." + zoneName + ".u" + bits + "[" + hex(translated.offset >>> offsetShift) + "]";
+				var jsCode = this.lgpr(into) + " = ";
+				if (signedLoad)
+				{
+					var shift = 32 - bits;
+					if (shift == 0)
+						jsCode += reference + " | 0";
+					else
+						jsCode += "(" + reference + " << " + shift + ") >> " + shift;
+				}
+				else
+					jsCode += reference;
+				jsCode += ";\n";
+				
+				return jsCode;
+			}
 		}
 		else
 		{
-			return this.lgpr(into) + " = this.memory.read" + bits + "(" + address + ");\n";
+			if (offset != 0)
+				address += " + " + offset;
+			this.setReg(into, null);
+			if (signedLoad)
+			{
+				var shift = 32 - bits;
+				var reference = "this.memory.read" + bits + "(" + address + ")";
+				if (shift == 0)
+					return this.lgpr(into) + " = " + reference + " | 0;\n";
+				else
+					return this.lgpr(into) + " = (" + reference + " << " + shift + ") >> " + shift + ";\n";
+			}
+			else
+			{
+				return this.lgpr(into) + " = this.memory.read" + bits + "(" + address + ");\n";
+			}
 		}
 	}
 	
@@ -469,15 +517,35 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 			this.panic("undefined argument");
 		
 		var address = this.gpr(addressReg);
-		if (isKnown(address))
-			address = Recompiler.unsign(address);
-		
 		offset = signExt(offset, 16);
-		address += " + " + offset;
-		
-		var jsCode = "this.memory.write" + bits + "(" + address + ", " + this.gpr(value) + ");\n";
-		jsCode += "this.invalidate(" + address + ");\n";
-		return jsCode;
+		if (isKnown(address))
+		{
+			address = Recompiler.unsign(address) + offset;
+			var translated = this.memory.translate(address);
+			if (translated.buffer == MemoryMap.unmapped)
+			{
+				return "this.psx.diags.warn(\"writing to unmapped memory address " + hex(address) + " from PC=" + hex(this.address - 4) + "\");\n";
+			}
+			else
+			{
+				var zoneName = translated.buffer.zoneName;
+				var offsetShift = bits >>> 4;
+				
+				var jsCode = "this.memory." + zoneName + ".u" + bits + "[" + hex(translated.offset >>> offsetShift) + "] = " + this.gpr(value) + ";\n";
+				if (zoneName == "ram" || zoneName == "scratchpad")
+					jsCode += "this.invalidate(" + address + ");\n";
+				
+				return jsCode;
+			}
+		}
+		else
+		{
+			if (offset != 0)
+				address += " + " + offset;
+			var jsCode = "this.memory.write" + bits + "(" + address + ", " + this.gpr(value) + ");\n";
+			jsCode += "this.invalidate(" + address + ");\n";
+			return jsCode;
+		}
 	}
 	
 	Recompiler.Context.prototype.delaySlot = function()
@@ -486,7 +554,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 		try
 		{
 			var delaySlotAddress = this.address + 4;
-			var instruction = this.memory.read32(delaySlotAddress);
+			var instruction = this.checkedRead32(delaySlotAddress);
 			var delaySlot = Disassembler.getOpcode(instruction);
 			if (delaySlot.instruction.name[0] == 'b' || delaySlot.instruction.name[0] == 'j')
 				return "this.panic('branch in delay slot is undefined behavior', " + delaySlotAddress + ");\n";
@@ -757,7 +825,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	});
 	
 	impl("lw", function(s, t, i) {
-		return this.load(32, s, i, t);
+		return this.load(32, s, i, t, false);
 	});
 	
 	impl("lwc2", function() {
