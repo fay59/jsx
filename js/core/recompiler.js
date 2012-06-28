@@ -458,56 +458,21 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 			return;
 		
 		var address = this.gpr(addressReg);
-		offset = signExt(offset, 16);
 		if (isKnown(address))
+			address = Recompiler.unsign(address);
+		
+		offset = signExt(offset, 16);
+		address += " + " + offset;
+		
+		this.setReg(into, null);
+		if (signedLoad)
 		{
-			address = Recompiler.unsign(address) + offset;
-			var translated = this.memory.translate(address);
-			if (translated.buffer == MemoryMap.unmapped)
-			{
-				var jsCode = "this.psx.diags.warn(\"reading from unmapped memory address " + hex(address) + " from PC=" + hex(this.address - 4) + "\");\n";
-				jsCode += this.lgpr(into) + " = 0;\n";
-				return jsCode;
-			}
-			else
-			{
-				var zoneName = translated.buffer.zoneName;
-				var offsetShift = bits >>> 4;
-				var reference = "this.memory." + zoneName + ".u" + bits + "[" + hex(translated.offset >>> offsetShift) + "]";
-				var jsCode = this.lgpr(into) + " = ";
-				if (signedLoad)
-				{
-					var shift = 32 - bits;
-					if (shift == 0)
-						jsCode += reference + " | 0";
-					else
-						jsCode += "(" + reference + " << " + shift + ") >> " + shift;
-				}
-				else
-					jsCode += reference;
-				jsCode += ";\n";
-				
-				return jsCode;
-			}
+			var shift = 32 - bits;
+			return this.lgpr(into) + " = (this.memory.read" + bits + "(" + address + ") << " + shift + ") >> " + shift + ";\n";
 		}
 		else
 		{
-			if (offset != 0)
-				address += " + " + offset;
-			this.setReg(into, null);
-			if (signedLoad)
-			{
-				var shift = 32 - bits;
-				var reference = "this.memory.read" + bits + "(" + address + ")";
-				if (shift == 0)
-					return this.lgpr(into) + " = " + reference + " | 0;\n";
-				else
-					return this.lgpr(into) + " = (" + reference + " << " + shift + ") >> " + shift + ";\n";
-			}
-			else
-			{
-				return this.lgpr(into) + " = this.memory.read" + bits + "(" + address + ");\n";
-			}
+			return this.lgpr(into) + " = this.memory.read" + bits + "(" + address + ");\n";
 		}
 	}
 	
@@ -517,35 +482,15 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 			this.panic("undefined argument");
 		
 		var address = this.gpr(addressReg);
-		offset = signExt(offset, 16);
 		if (isKnown(address))
-		{
-			address = Recompiler.unsign(address) + offset;
-			var translated = this.memory.translate(address);
-			if (translated.buffer == MemoryMap.unmapped)
-			{
-				return "this.psx.diags.warn(\"writing to unmapped memory address " + hex(address) + " from PC=" + hex(this.address - 4) + "\");\n";
-			}
-			else
-			{
-				var zoneName = translated.buffer.zoneName;
-				var offsetShift = bits >>> 4;
-				
-				var jsCode = "this.memory." + zoneName + ".u" + bits + "[" + hex(translated.offset >>> offsetShift) + "] = " + this.gpr(value) + ";\n";
-				if (zoneName == "ram" || zoneName == "scratchpad")
-					jsCode += "this.invalidate(" + address + ");\n";
-				
-				return jsCode;
-			}
-		}
-		else
-		{
-			if (offset != 0)
-				address += " + " + offset;
-			var jsCode = "this.memory.write" + bits + "(" + address + ", " + this.gpr(value) + ");\n";
-			jsCode += "this.invalidate(" + address + ");\n";
-			return jsCode;
-		}
+			address = Recompiler.unsign(address);
+		
+		offset = signExt(offset, 16);
+		address += " + " + offset;
+		
+		var jsCode = "this.memory.write" + bits + "(" + address + ", " + this.gpr(value) + ");\n";
+		jsCode += "this.invalidate(" + address + ");\n";
+		return jsCode;
 	}
 	
 	Recompiler.Context.prototype.delaySlot = function()
