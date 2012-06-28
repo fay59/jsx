@@ -15,15 +15,17 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 			
 			try
 			{
-				console.time("100 interrupts");
-				console.profile();
+				var timerName = "100 interrupts";
+				console.time(timerName);
+				console.profile(timerName);
 				for (var i = 0; i < 100; i++)
 				{
 					console.log("Running frame...");
 					window.psx.runFrame();
 				}
-				console.profileEnd();
-				console.timeEnd("100 interrupts");
+				console.profileEnd(timerName);
+				console.timeEnd(timerName);
+				document.querySelector("#crash").textContent = "Done.";
 			}
 			catch (e)
 			{
@@ -72,7 +74,6 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 				}
 				document.querySelector("#missing-count").textContent = totalUnimplemented + "/" + totalJitted;
 			}
-			document.querySelector("#crash").textContent += "Done.";
 		}
 		
 		reader.readAsArrayBuffer(this.files[0]);

@@ -458,21 +458,55 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 			return;
 		
 		var address = this.gpr(addressReg);
-		if (isKnown(address))
-			address = Recompiler.unsign(address);
 		
-		offset = signExt(offset, 16);
-		address += " + " + offset;
-		
+		// this.setReg must succeed to this.gpr because it would otherwise wreck
+		// havoc on situations like lw t0, t0+5
 		this.setReg(into, null);
-		if (signedLoad)
+		offset = signExt(offset, 16);
+		if (isKnown(address))
 		{
-			var shift = 32 - bits;
-			return this.lgpr(into) + " = (this.memory.read" + bits + "(" + address + ") << " + shift + ") >> " + shift + ";\n";
+			var targetAddress = Recompiler.unsign(address) + offset;
+			var translated = this.memory.translate(targetAddress);
+			if (translated.buffer == MemoryMap.unmapped)
+			{
+				var jsCode = "this.psx.diags.warn(\"reading " + bits + " bits from unmapped memory address " + hex(address) + " from PC=" + hex(this.address - 4) + "\");\n";
+				jsCode += this.lgpr(into) + " = undefined;\n";
+				return jsCode;
+			}
+			else
+			{
+				var offsetShift = bits >>> 4;
+				var zoneName = translated.buffer.zoneName;
+				var bufferOffset = hex(translated.offset >>> offsetShift);
+				var reference = "this.memory." + zoneName + ".u" + bits + "[" + bufferOffset + "]";
+				var jsCode = this.lgpr(into) + " = ";
+				if (signedLoad)
+				{
+					var shift = 32 - bits;
+					jsCode += "(" + reference + " << " + shift + ") >> " + shift;
+				}
+				else
+				{
+					jsCode += reference;
+				}
+				jsCode += ";\n";
+				return jsCode;
+			}
 		}
 		else
 		{
-			return this.lgpr(into) + " = this.memory.read" + bits + "(" + address + ");\n";
+			if (offset != 0)
+				address += " + " + offset;
+			
+			if (signedLoad)
+			{
+				var shift = 32 - bits;
+				return this.lgpr(into) + " = (this.memory.read" + bits + "(" + address + ") << " + shift + ") >> " + shift + ";\n";
+			}
+			else
+			{
+				return this.lgpr(into) + " = this.memory.read" + bits + "(" + address + ");\n";
+			}
 		}
 	}
 	

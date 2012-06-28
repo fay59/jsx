@@ -3,6 +3,7 @@ var PSX = function(diags, webgl, bios, controller1StateArray, controller2StateAr
 	this.emulatedSystem = PSX.NTSC;
 	
 	this.diags = diags;
+	
 	this.bios = new GeneralPurposeBuffer(bios);
 	this.parallelPort = new ParallelPortMemoryRange(this);
 	

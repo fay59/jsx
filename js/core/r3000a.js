@@ -146,7 +146,7 @@ R3000a.prototype.writeCOP0 = function(reg, value)
 	var oldValue = this.cop0_reg[reg];
 	this.cop0_reg[reg] = value;
 	
-	this.psx.diags.log("Writing 0x%08x to %s", value, Disassembler.cop0RegisterNames[reg]);
+	// this.psx.diags.log("Writing 0x%08x to %s", value, Disassembler.cop0RegisterNames[reg]);
 	
 	switch (reg)
 	{

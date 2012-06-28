@@ -15,6 +15,12 @@ var MemoryCache = function(memory)
 	// just hide stuff till IsC goes out in the SR
 	this.hidden = memory;
 	this.compiled = memory.compiled;
+	
+	this.ram = MemoryMap.unmapped;
+	this.scratchpad = MemoryMap.unmapped;
+	this.hardware = MemoryMap.unmapped;
+	this.parallelPort = MemoryMap.unmapped;
+	this.bios = MemoryMap.unmapped;
 }
 
 MemoryCache.returnZero = function() { return 0; }
@@ -42,15 +48,15 @@ var MemoryMap = function(psx, hardware, parallelPort, bios)
 	this.bios = bios;
 	
 	this.ram.offset = 0x00000000;
-	this.ram.zoneName = "RAM";
+	this.ram.zoneName = "ram";
 	this.scratchpad.offset = 0x1F800000;
-	this.scratchpad.zoneName = "Scratchpad";
+	this.scratchpad.zoneName = "scratchpad";
 	this.parallelPort.offset = 0x1F000000;
-	this.parallelPort.zoneName = "Parallel Port";
+	this.parallelPort.zoneName = "parallelPort";
 	this.hardware.offset = 0x1F801000;
-	this.hardware.zoneName = "Hardware registers";
+	this.hardware.zoneName = "hardware";
 	this.bios.offset = 0x1FC00000;
-	this.bios.zoneName = "BIOS";
+	this.bios.zoneName = "bios";
 	
 	const pages = 0x20000000 / 0x1000;
 	this.pageMap = new Array(pages);

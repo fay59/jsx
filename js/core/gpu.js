@@ -112,11 +112,10 @@ GPU.primitiveSizeTable = new Uint8Array([
 	// f8
 	0,0,0,0,0,0,0,0
 ]);
-GPU.primitiveCallTable = []; // TODO fill me
+GPU.primitiveCallTable = [];
 
 GPU.prototype.install = function(hwregs)
 {
-	var self = this;
 	hwregs.wire(0x1f801810,
 		this.readDataRegister.bind(this),
 		this.writeDataRegister.bind(this)
@@ -189,7 +188,7 @@ GPU.prototype.updateDisplayIfChanged = function()
 GPU.prototype.readStatusRegister = function()
 {
 	// (x << 30) * 2 to remain unsigned
-	return self.status | ((this.lineOddOrEven << 30) * 2);
+	return this.statusRegValue | ((this.lineOddOrEven << 30) * 2);
 }
 
 GPU.prototype.writeStatusRegister = function(data)
@@ -302,9 +301,9 @@ GPU.prototype.writeDataRegister = function(value)
 		this.dataWriteIndex++;
 	}
 	
-	if (this.dataWriteAddress == this.dataWriteCount)
+	if (this.dataWriteIndex == this.dataWriteCount)
 	{
-		this.dataWriteAddress = 0;
+		this.dataWriteIndex = 0;
 		this.dataWriteCount = 0;
 		GPU.primitiveCallTable[this.command].call(this, this.data, 0);
 	}
@@ -356,127 +355,127 @@ GPU.prototype.dmaChain = function(baseAddress, offset)
 	
 	var primNI = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive");
 	}
 	
 	var primBlkFill = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive primBlkFill");
 	}
 	
 	var primPolyF3 = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive primPolyF3");
 	}
 	
 	var primPolyFT3 = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive primPolyFT3");
 	}
 	
 	var primPolyF4 = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive primPolyF4");
 	}
 	
 	var primPolyFT4 = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive primPolyFT4");
 	}
 	
 	var primPolyG3 = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive primPolyG3");
 	}
 	
 	var primPolyGT3 = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive primPolyGT3");
 	}
 	
 	var primPolyG4 = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive primPolyG4");
 	}
 	
 	var primPolyGT4 = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive primPolyGT4");
 	}
 	
 	var primLineF2 = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive primLineF2");
 	}
 	
 	var primTileS = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive primTileS");
 	}
 	
 	var primSprtS = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive primSprtS");
 	}
 	
 	var primSprt8 = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive primSprt8");
 	}
 	
 	var primSprt16 = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive primSprt16");
 	}
 	
 	var primMoveImage = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive primMoveImage");
 	}
 	
 	var primLoadImage = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive primLoadImage");
 	}
 	
 	var primStoreImage = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive primStoreImage");
 	}
 	
 	var cmdTexturePage = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive cmdTexturePage");
 	}
 	
 	var cmdTextureWindow = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive cmdTextureWindow");
 	}
 	
 	var cmdDrawAreaStart = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive cmdDrawAreaStart");
 	}
 	
 	var cmdDrawAreaEnd = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive cmdDrawAreaEnd");
 	}
 	
 	var cmdDrawAreaStart = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive cmdDrawAreaStart");
 	}
 	
 	var cmdDrawOffset = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive cmdDrawOffset");
 	}
 	
 	var cmdSTP = function()
 	{
-		this.psx.diags.err("unknown primitive");
+		this.psx.diags.error("unknown primitive cmdSTP");
 	}
 	
 	GPU.primitiveCallTable = [
@@ -513,4 +512,4 @@ GPU.prototype.dmaChain = function(baseAddress, offset)
 		primNI, primNI, primNI, primNI, primNI, primNI, primNI, primNI,  // f0
 		primNI, primNI, primNI, primNI, primNI, primNI, primNI, primNI // f8
 	];
-});
+})();

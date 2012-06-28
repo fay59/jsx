@@ -163,7 +163,12 @@ var Tests = {
 			}
 			
 			var mdec = new MotionDecoder();
-			var hardware = new HardwareRegisters({diags: PSX.noDiags}, mdec);
+			var psx = {
+				diags: PSX.noDiags,
+				emulatedSystem: { frameRate: 60 },
+				cpu: { cycles: 0 }
+			};
+			var hardware = new HardwareRegisters(psx, mdec);
 			verify(hardware.u8, "u8");
 			verify(hardware.u16, "u16");
 			verify(hardware.u32, "u32");
