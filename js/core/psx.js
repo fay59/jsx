@@ -16,6 +16,8 @@ var PSX = function(diags, webgl, bios, controller1StateArray, controller2StateAr
 	
 	this.gpu.install(this.hardwareRegisters);
 	this.spu.install(this.hardwareRegisters);
+	
+	this.pc = 0;
 }
 
 PSX.noDiags = {

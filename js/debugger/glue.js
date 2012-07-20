@@ -1,90 +1,34 @@
 var psx = null;
 var dbg = null;
-var memory = null;
 
-document.addEventListener("DOMContentLoaded", including.bind(null,
-	"js/core/disasm.js", "js/core/r3000a.js", "js/core/compiled.js", "js/core/hwregs.js",
-	"js/core/parallel.js", "js/core/memory.js", "js/core/recompiler.js", "js/core/asm.js",
-	"js/core/mdec.js", "js/core/gpu.js", "js/debugger/debugger.js", "js/debugger/disasm-table.js",
-	"js/debugger/breakpoint.js", "js/debugger/breakpoint-table.js",
-	function() {
+var requiredScripts = [
+	"js/core/disasm.js",
+	"js/core/r3000a.js",
+	"js/core/compiled.js",
+	"js/core/hwregs.js",
+	"js/core/parallel.js",
+	"js/core/memory.js",
+	"js/core/recompiler.js",
+	"js/core/asm.js",
+	"js/core/mdec.js",
+	"js/core/gpu.js",
+	"js/core/spu.js",
+	"js/core/counters.js",
+	"js/core/psx.js",
+	"js/debugger/debugger.js",
+	"js/debugger/disasm-table.js",
+	"js/debugger/breakpoint.js",
+	"js/debugger/breakpoint-table.js"];
+
+function onload()
+{
 	const disassemblyLength = 25;
-	
-	psx = new R3000a();
-	dbg = new Debugger(psx);
-	
-	function reset()
-	{
-		psx.stop();
-		dbg.reset(R3000a.bootAddress, memory);
-		
-		var message = "Loaded BIOS » 0x" + Recompiler.formatHex(dbg.pc);
-		status.display(message, 'black');
-	}
+	var bios = null;
 	
 	var status = new StatusQueue(document.querySelector("#status"));
 	var disasm = new DisassemblyTable(document.querySelector("#disasm"));
-	var breakpoints = new BreakpointTable(document.querySelector("#breakpoints"), dbg.breakpoints);
-	
-	var resetButton = document.querySelector("#reset");
-	var runButton = document.querySelector("#run");
-	var stepOverButton = document.querySelector("#step-over");
-	var stepIntoButton = document.querySelector("#step-into");
-	var pauseButton = document.querySelector("#pause");
-	var goToButton = document.querySelector("#goto");
-	var disasmContainer = document.querySelector("#disasm-container");
-	var breakpoints = document.querySelector("#breakpoints");
-	var addBreakpointButton = document.querySelector("#add-breakpoint");
-	
-	var stack = document.querySelector("#stack");
-	stack.addEventListener("change", function()
-	{
-		var option = this.selectedOptions[0];
-		var address = parseInt(this.value.substr(2), 16);
-		disasm.reset(psx.memory, address - 8, address + 0x80, address, runPC, toggleBreakpoint);
-	});
-	
-	function refreshStack()
-	{
-		while (stack.childNodes.length)
-			stack.removeChild(stack.firstChild);
-		
-		for (var i = 0; i < dbg.stack.length; i++)
-		{
-			var option = document.createElement('option');
-			option.textContent = i + ": " + Recompiler.formatHex(dbg.stack[i]);
-			stack.insertBefore(option, stack.firstChild);
-		}
-		
-		var option = document.createElement('option');
-		option.textContent = dbg.stack.length + ": " + Recompiler.formatHex(dbg.pc);
-		stack.insertBefore(option, stack.firstChild);
-	}
-	
-	function runPC()
-	{
-		var pc = parseInt(this.parentNode.childNodes[1].textContent, 16);
-		if (event.altKey)
-		{
-			diagnostics.log("setting PC to " + Recompiler.formatHex(pc));
-			dbg.pc = pc;
-			pauseButton.disabled = true;
-			disasm.select(pc);
-		}
-		else if (pc > dbg.pc)
-		{
-			diagnostics.log("running to " + Recompiler.formatHex(pc));
-			dbg.runUntil(pc);
-		}
-	}
-	
-	function toggleBreakpoint()
-	{
-		var address = parseInt(this.textContent, 16);
-		dbg.breakpoints.toggleBreakpoint(address);
-	}
-	
-	var diagnostics = {
+	var breakpointTable = new BreakpointTable(document.querySelector("#breakpoints"));
+	var diags = {
 		error: function(message)
 		{
 			console.error(message);
@@ -109,10 +53,33 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 		}
 	};
 	
-	dbg.diags = diagnostics;
-	psx.setDiagnosticsOutput(diagnostics);
+	var resetButton = document.querySelector("#reset");
+	var runButton = document.querySelector("#run");
+	var stepOverButton = document.querySelector("#step-over");
+	var stepIntoButton = document.querySelector("#step-into");
+	var pauseButton = document.querySelector("#pause");
+	var goToButton = document.querySelector("#goto");
+	var disasmContainer = document.querySelector("#disasm-container");
+	var addBreakpointButton = document.querySelector("#add-breakpoint");
+	var stack = document.querySelector("#stack");
+	var biosPicker = document.querySelector("#bios-picker");
+	var regContainers = document.querySelectorAll(".regs");
+	var registerLabels = document.querySelectorAll("#regs > legend span");
+	var utilLabels = document.querySelectorAll("#utils > legend span");
 	
-	dbg.addEventListener("stepped", function()
+	function reset()
+	{
+		psx = new PSX(diags, null, bios, [], []);
+		dbg = new Debugger(psx);
+		dbg.addEventListener(Debugger.STEPPED_EVENT, onStep);
+		dbg.addEventListener(Debugger.STEPPED_INTO_EVENT, refreshStack);
+		dbg.addEventListener(Debugger.STEPPED_OUT_EVENT, refreshStack);
+		
+		breakpointTable.reset(dbg.breakpoints);
+		dbg.reset(R3000a.bootAddress);
+	}
+	
+	function onStep()
 	{
 		for (var i = 0; i < regs.length; i++)
 			regs[i].update();
@@ -143,29 +110,88 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 			var frameNumber = stack.childNodes.length - 1;
 			stack.firstChild.textContent = frameNumber + ": " + hexPC;
 		}
-		diagnostics.log("BIOS » " + hexPC);
-	});
+		diags.log("BIOS » " + hexPC);
+	}
 	
-	dbg.addEventListener("steppedinto", refreshStack);
-	dbg.addEventListener("steppedout", refreshStack);
+	function refreshStack()
+	{
+		while (stack.childNodes.length)
+			stack.removeChild(stack.firstChild);
+		
+		for (var i = 0; i < dbg.stack.length; i++)
+		{
+			var option = document.createElement('option');
+			option.textContent = i + ": " + Recompiler.formatHex(dbg.stack[i]);
+			stack.insertBefore(option, stack.firstChild);
+		}
+		
+		var option = document.createElement('option');
+		option.textContent = dbg.stack.length + ": " + Recompiler.formatHex(dbg.pc);
+		stack.insertBefore(option, stack.firstChild);
+	}
 	
-	document.querySelector("#bios-picker").addEventListener("change", function()
+	function readBios(event)
 	{
 		var reader = new FileReader();
 		reader.onload = function()
 		{
-			var bios = new GeneralPurposeBuffer(reader.result);
-			var mdec = new MotionDecoder();
-			var gpu = new GPU(null);
-			var hardwareRegisters = new HardwareRegisters(mdec, gpu);
-			var parallelPort = new ParallelPortMemoryRange();
-			memory = new MemoryMap(hardwareRegisters, parallelPort, bios);
-			mdec.reset(memory);
-			
+			bios = reader.result;
 			reset();
 		}
 		reader.readAsArrayBuffer(this.files[0]);
-	});
+	}
+	
+	function goToPC(pc)
+	{
+		disasm.reset(psx.memory, pc - 8, pc + 0x80, pc, runPC, toggleBreakpoint);
+	}
+	
+	function runPC(event)
+	{
+		var pc = parseInt(this.parentNode.childNodes[1].textContent, 16);
+		if (event.altKey)
+		{
+			diags.log("setting PC to " + Recompiler.formatHex(pc));
+			dbg.pc = pc;
+			pauseButton.disabled = true;
+			disasm.select(pc);
+		}
+		else if (pc > dbg.pc)
+		{
+			diags.log("running to " + Recompiler.formatHex(pc));
+			dbg.runUntil(pc);
+		}
+	}
+	
+	function toggleBreakpoint()
+	{
+		var address = parseInt(this.textContent, 16);
+		dbg.breakpoints.toggleBreakpoint(address);
+	}
+	
+	function showDivByIndex(index)
+	{
+		return function()
+		{
+			var divs = this.parentNode.parentNode.querySelectorAll(".collapsable");
+			for (var i = 0; i < divs.length; i++)
+			{
+				if (i == index)
+					divs[i].style.display = "block";
+				else
+					divs[i].style.display = "none";
+			}
+		}
+	}
+	
+	function makeTitle(i)
+	{
+		return function()
+		{
+			if (dbg != null)
+				this.title = Recompiler.formatHex(dbg.lastRegWrites[i]);
+		}
+	}
 	
 	function regField(kind, byteSize, id, nameArray)
 	{
@@ -200,12 +226,17 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 		return label;
 	}
 	
-	function makeTitle(i)
-	{
-		return function() { this.title = Recompiler.formatHex(dbg.lastRegWrites[i]); }
-	}
+	function run() { dbg.run(); }
+	function stepOver() { dbg.stepOver(); }
+	function stepInto() { dbg.stepInto(); }
 	
-	var regContainers = document.querySelectorAll(".regs");
+	resetButton.addEventListener("click", reset);
+	runButton.addEventListener("click", run);
+	stepOverButton.addEventListener("click", stepOver);
+	stepIntoButton.addEventListener("click", stepInto);
+	
+	pauseButton.style.display = 'none';
+	
 	var regs = [];
 	for (var i = 0; i < 16; i++)
 	{
@@ -225,28 +256,20 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 		gpr.addEventListener("mouseover", makeTitle(i));
 	}
 	
-	function showDivByIndex(index)
-	{
-		return function()
-		{
-			var divs = this.parentNode.parentNode.querySelectorAll(".collapsable");
-			for (var i = 0; i < divs.length; i++)
-			{
-				if (i == index)
-					divs[i].style.display = "block";
-				else
-					divs[i].style.display = "none";
-			}
-		}
-	}
-	
-	var registerLabels = document.querySelectorAll("#regs > legend span");
 	for (var i = 0; i < registerLabels.length; i++)
 		registerLabels[i].addEventListener("click", showDivByIndex(i));
 	
-	var utilLabels = document.querySelectorAll("#utils > legend span");
 	for (var i = 0; i < utilLabels.length; i++)
 		utilLabels[i].addEventListener("click", showDivByIndex(i));
+	
+	biosPicker.addEventListener("change", readBios);
+	
+	stack.addEventListener("change", function()
+	{
+		var option = this.selectedOptions[0];
+		var address = parseInt(this.value.substr(2), 16);
+		goToPC(address);
+	});
 	
 	disasmContainer.addEventListener("scroll", function(e)
 	{
@@ -265,35 +288,6 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 		}
 	});
 	
-	pauseButton.disabled = true;
-	
-	var run = dbg.run.bind(dbg);
-	var stepOver = dbg.stepOver.bind(dbg);
-	var stepInto = dbg.stepInto.bind(dbg);
-	
-	function pause()
-	{
-		// TODO cannot pause with the new system
-		pauseButton.disabled = true;
-	}
-	
-	function goTo()
-	{
-		var address = prompt("Go to address (hex):", Recompiler.formatHex(dbg.pc));
-		if (address !== null)
-		{
-			var realAddress = parseInt(address, 16) - 4;
-			disasm.reset(psx.memory, realAddress - 8, realAddress + 0x80, realAddress, runPC, toggleBreakpoint);
-		}
-	}
-	
-	resetButton.addEventListener("click", reset);
-	runButton.addEventListener("click", run);
-	stepOverButton.addEventListener("click", stepOver);
-	stepIntoButton.addEventListener("click", stepInto);
-	pauseButton.addEventListener("click", pause);
-	goToButton.addEventListener("click", goTo);
-	
 	addBreakpointButton.addEventListener("click", function()
 	{
 		var address = prompt("Breakpoint address (hex):");
@@ -308,17 +302,12 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 		switch (e.which)
 		{
 			case 13: stepOver(); break;
-			case 27: pause(); break;
 			case 39:
 				if (dbg.canStepInto())
 					dbg.stepInto();
 				break;
-			
-			case 9:
-				if (e.shiftKey) goTo();
-				break;
 		}
 	});
-	
-	status.display("← Waiting for a BIOS...");
-	}));
+}
+
+document.addEventListener("DOMContentLoaded", including.bind(null, requiredScripts, onload));

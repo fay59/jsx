@@ -4,8 +4,36 @@ var BreakpointTable = function(tbody, breakpointList)
 	this.breakpointList = breakpointList;
 	this.breakpointRows = {};
 	
-	this.breakpointList.addEventListener("addedbreakpoint", this._breakpointAdded.bind(this));
-	this.breakpointList.addEventListener("removedbreakpoint", this._breakpointRemoved.bind(this));
+	this._added = this._breakpointAdded.bind(this);
+	this._removed = this._breakpointRemoved.bind(this);
+	
+	if (breakpointList != undefined)
+		this.reset(breakpointList);
+}
+
+BreakpointTable.prototype.reset = function(breakpointList)
+{
+	if (this.breakpointList != undefined)
+	{
+		for (var address in this.breakpointList.list)
+		{
+			var bp = this.breakpointList[address];
+			this._breakpointRemoved({breakpoint: bp});
+		}
+		
+		this.breakpointList.removeEventListener("addedbreakpoint", this._added);
+		this.breakpointList.removeEventListener("removedbreakpoint", this._removed);
+	}
+	
+	for (var address in breakpointList.list)
+	{
+		var bp = breakpointList[address];
+		this._breakpointAdded({breakpoint: bp});
+	}
+	
+	this.breakpointList = breakpointList;
+	this.breakpointList.addEventListener("addedbreakpoint", this._added);
+	this.breakpointList.addEventListener("removedbreakpoint", this._removed);
 }
 
 BreakpointTable.prototype._breakpointRemoved = function(event)

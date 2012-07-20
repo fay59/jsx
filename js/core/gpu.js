@@ -1,5 +1,5 @@
 // based on Duddie's GPU plugin for PSEPro
-// Thank you Duddie! You made the only almost-intelligible Playstation GPU plugin.
+// Thank you, Duddie, for making the only almost-intelligible Playstation GPU plugin.
 
 var GPU = function(psx, glContext)
 {
@@ -22,6 +22,79 @@ var GPU = function(psx, glContext)
 	this.s16 = new Int16Array(this.vram);
 	this.u32 = new Uint32Array(this.vram);
 	this.s32 = new Int32Array(this.vram);
+	
+	// rendering stuff
+	this.gM1 = 255;
+	this.gM2 = 255;
+	this.gM3 = 255;
+	this.drawSemiTransparent = false;
+	this.yMin = 0;
+	this.yMax = 0;
+	this.ly0 = 0;
+	this.lx0 = 0;
+	this.ly1 = 0;
+	this.lx1 = 0;
+	this.ly2 = 0;
+	this.lx2 = 0;
+	this.ly3 = 0;
+	this.lx3 = 0;
+	this.globalTextureAddrX = 0;
+	this.globalTextureAddrY = 0;
+	this.globalTextureTP = 0;
+	this.globalTextureABR = 0;
+	
+	// zn interface
+	this.gpuVersion = 0;
+	this.gpuHeight = 512;
+	this.gpuHeightMask = 511;
+	this.globalTextureIL = 0;
+	this.tileCheat = 0;
+	
+	// primitives stuff
+	this.drawTextured = false;
+	this.drawSmoothShaded = false;
+	this.oldSmoothShaded = false;
+	this.drawNonShaded = false;
+	this.drawMultiPass = false;
+	this.offscreenDrawing = 0;
+	this.drawnSomething = 0;
+	
+	this.renderToFrontBuffer = false;
+	this.globalTextureAlpha = 0;
+	this.globalColorAlpha = 0;
+	this.filterType = 0;
+	this.fullVRAM = false
+	this.drawDither = false;
+	this.useMultiPass = false;
+	this.textureName = 0;
+	this.textureEnabled = false;
+	this.blendEnabled = false;
+	this.uploadArea = {x: 0, y: 0, width: 0, height: 0};
+	this.uploadAreaIL = {x: 0, y: 0, width: 0, height: 0};
+	this.uploadAreaRGB24 = {x: 0, y: 0, width: 0, height: 0};
+	this.spriteTexture = false;
+	this.mirror = 0;
+	this.needUploadAfter = false;
+	this.needUploadTest = false;
+	this.usingTWin = false;
+	this.usingMovie = false;
+	this.movieArea = {x: 0, y: 0, width: 0, height: 0};
+	this.spriteAjust_ux2 = 0;
+	this.spriteAjust_vy2 = 0;
+	this.oldColor = 0;
+	this.clutID = 0;
+	this.cfgFixes = 0;
+	this.actFixes = 0;
+	this.emuFixes = 0;
+	this.useFixes = false;
+	this.drawX = 0;
+	this.drawY = 0;
+	this.drawWidth = 0;
+	this.drawHeight = 0;
+	this.sxMin = 0;
+	this.sxMax = 0;
+	this.syMin = 0;
+	this.syMax = 0;
 	
 	this.display = {
 		x: 0,
@@ -353,6 +426,43 @@ GPU.prototype.dmaChain = function(baseAddress, offset)
 		GPU.bgr2rgb[i] = (i & 0x8000) | ((i & 0x7c00) >> 10) | (i & 0x03e0) | ((i & 0x1f) << 10);
 	}
 	
+	GPU.prototype.updateGlobalTexturePage = function(data)
+	{
+		this.globalTextureAddrX = (data << 6) & 0x3c0;
+		if (this.gpuHeight == 1024)
+		{
+			if (this.gpuVersion == 2)
+			{
+				this.globalTextureAddrY = (data & 0x60) << 3;
+				this.globalTextureIL = (data & 0x2000) >>> 13;
+				this.globalTextureABR = (data >>> 7) & 0x3;
+				this.globalTextureTP = (data >> 9) & 0x3;
+				if (this.globalTextureTP == 3)
+					this.globalTextureTP = 2;
+				this.globalTexturePage = (this.globalTextureAddrY >>> 6) + (this.globalTextureAddrX >>> 4);
+				this.mirror = 0;
+				this.statusRegValue = (this.statusRegValue & 0xffffe000) | (data & 0x1fff);
+				return;
+			}
+			else
+			{
+				this.globalTextureAddrY = ((data << 4) & 0x100) | ((data >>> 2) & 0x200);
+			}
+		}
+		else
+			this.globalTextureAddrY = (data << 4) & 0x100;
+		
+		this.mirror = data & 0x3000;
+		this.globalTexturePage = (this.globalTextureAddrY >>> 6) + (this.globalTextureAddrX >>> 4);
+		this.globalTextureABR = (data >>> 5) & 0x03;
+		this.globalTextureTP = (data >>> 6) & 0x3;
+		if (this.globalTextureTP == 3)
+			this.globalTextureTP = 2;
+		
+		this.statusRegValue = (this.statusRegValue & ~0x07ff) | (data & 0x07ff);
+	}
+	
+	// commands
 	var primNI = function()
 	{
 		this.psx.diags.error("unknown primitive");
@@ -443,9 +553,9 @@ GPU.prototype.dmaChain = function(baseAddress, offset)
 		this.psx.diags.error("unknown primitive primStoreImage");
 	}
 	
-	var cmdTexturePage = function()
+	var cmdTexturePage = function(data)
 	{
-		this.psx.diags.error("unknown primitive cmdTexturePage");
+		this.updateGlobalTexturePage(data[0] & 0xffff);
 	}
 	
 	var cmdTextureWindow = function()

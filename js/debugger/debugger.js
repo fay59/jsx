@@ -3,9 +3,10 @@ var Debugger = function(psx)
 	var self = this;
 	
 	this.stack = [];
+	this.psx = psx;
 	this.cpu = psx.cpu;
-	this.diag = psx.diags;
-	this.breakpoints = new BreakpointList(cpu);
+	this.diags = psx.diags;
+	this.breakpoints = new BreakpointList(this.cpu);
 	this._lastHitBreakpoint = null;
 	
 	this._pc = R3000a.bootAddress;
@@ -20,11 +21,10 @@ var Debugger = function(psx)
 		this._pc = Recompiler.unsign(x);
 	});
 	
-	this.eventListeners = {
-		stepped: [],
-		steppedinto: [],
-		steppedout: []
-	};
+	this.eventListeners = {};
+	this.eventListeners[Debugger.STEPPED_EVENT] = [];
+	this.eventListeners[Debugger.STEPPED_INTO_EVENT] = [];
+	this.eventListeners[Debugger.STEPPED_OUT_EVENT] = [];
 	
 	// intercept CPU register reads and writes
 	var regs = this.cpu.gpr;
@@ -52,8 +52,8 @@ var Debugger = function(psx)
 }
 
 Debugger.STEPPED_EVENT = "stepped";
-Debugger.STEPPED_INTO_EVENT = "stepped";
-Debugger.STEPPED_OUT_EVENT = "stepped";
+Debugger.STEPPED_INTO_EVENT = "steppedinto";
+Debugger.STEPPED_OUT_EVENT = "steppedout";
 
 Debugger.prototype.addEventListener = function(event, listener)
 {
@@ -77,13 +77,14 @@ Debugger.prototype.removeEventListener = function(event, listener)
 	return true;
 }
 
-Debugger.prototype.reset = function(pc, memory)
+Debugger.prototype.reset = function(pc)
 {
 	var self = this;
+	var memory = this.psx.memory;
 	
 	this.pc = pc;
 	this.stack = [this.pc];
-	this.cpu.reset(memory);
+	this.psx.reset();
 	this.breakpoints.resetHits();
 	for (var i = 0; i < this.lastRegWrites.length; i++)
 		this.lastRegWrites[i] = 0;

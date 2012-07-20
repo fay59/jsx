@@ -15,12 +15,14 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 			
 			try
 			{
-				var timerName = "100 interrupts";
+				const interruptCount = 5000;
+				var timerName = interruptCount + " interrupts";
 				console.time(timerName);
 				console.profile(timerName);
-				for (var i = 0; i < 100; i++)
+				for (var i = 0; i < interruptCount; i++)
 				{
 					console.log("Running frame...");
+					console.log("pc=" + window.psx.pc.toString(16));
 					window.psx.runFrame();
 				}
 				console.profileEnd(timerName);

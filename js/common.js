@@ -10,6 +10,16 @@ function including()
 			callback();
 	}
 	
+	function addScript(scriptURL)
+	{
+		scriptCount++;
+		var script = document.createElement("script");
+		script.type = "text/javascript";
+		script.src = scriptURL;
+		script.addEventListener("load", callbackCountdown);
+		document.head.appendChild(script);
+	}
+	
 	for (var i = 0; i < arguments.length; i++)
 	{
 		var arg = arguments[i];
@@ -19,12 +29,14 @@ function including()
 			break;
 		}
 		
-		scriptCount++;
-		var script = document.createElement("script");
-		script.type = "text/javascript";
-		script.src = arguments[i];
-		script.addEventListener("load", callbackCountdown);
-		document.head.appendChild(script);
+		if (arg.forEach == undefined)
+		{
+			addScript(arg);
+		}
+		else
+		{
+			arg.forEach(addScript);
+		}
 	}
 	
 	if (scriptCount == 0)

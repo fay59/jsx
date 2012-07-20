@@ -27,7 +27,6 @@ FunctionCache.prototype.functionDirty = function(address)
 		{
 			if (this.invalidationMap[j >>> 8] > fn.jitTime)
 			{
-				delete this.compiled[address];
 				return true;
 			}
 		}

@@ -96,9 +96,9 @@ Recompiler.prototype.recompileOne = function(memory, address)
 	
 	var instruction = memory.read32(address);
 	var op = Disassembler.getOpcode(instruction);
-	var injectedBefore = this._injectBefore(currentAddress, op, this.isDelaySlot);
+	var injectedBefore = this._injectBefore(address, op, this.isDelaySlot);
 	var code = context.recompileOpcode(address, op);
-	var injectedAfter = this._injectAfter(currentAddress, op, this.isDelaySlot);
+	var injectedAfter = this._injectAfter(address, op, this.isDelaySlot);
 	
 	var code = Recompiler.functionPrelude
 		+ "var pc = 0x" + Recompiler.formatHex(address) + " + 4;\n"

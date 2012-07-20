@@ -165,8 +165,11 @@ R3000a.prototype.writeCOP0 = function(reg, value)
 
 R3000a.prototype.clock = function(ticks)
 {
-	// 32 bits unsigned add
-	this.cycles += ticks;
+	// PCSX doubles the cycle count for reasons unknown to me, but they're
+	// probably right
+	const bias = 2;
+	
+	this.cycles += ticks * bias;
 	var lastBit = this.cycles & 1;
 	this.cycles = (this.cycles >>> 1) * 2 + lastBit;
 	
