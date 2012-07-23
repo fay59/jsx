@@ -269,65 +269,65 @@ GPU.prototype.writeStatusRegister = function(data)
 	var command = (data >>> 24) & 0xff;
 	switch (command)
 	{
-		case 0x00: // reset
-			this.psx.diags.warn("Implement the GPU.writeStatusRegister 'reset' case");
-			return;
+	case 0x00: // reset
+		this.psx.diags.warn("Implement the GPU.writeStatusRegister 'reset' case");
+		return;
+	
+	case 0x03: // enable/disable display
+		this.psx.diags.warn("Implement the GPU.writeStatusRegister 'enable/disable display' case");
+		return;
+	
+	case 0x04: // set transfer mode
+		var transferMode = data & 0xffffff;
+		if (transferMode == 0)
+			this.imageTransfer = 0;
+		else if (transferMode == 2)
+			this.imageTransfer = 3;
+		return;
+	
+	case 0x05: // set display portion
+		this.display.y = (data >>> 10) & 0x3ff;
+		this.display.x = data & 0x3ff;
+		if (!this.display.lace)
+			this.updateDisplay();
+		return;
+	
+	case 0x06: // set width
+		this.psx.diags.warn("Implement the GPU.writeStatusRegister 'set width' case");
+		return;
+	
+	case 0x07: // set height
+		this.psx.diags.warn("Implement the GPU.writeStatusRegister 'set height' case");
+		return;
+	
+	case 0x08: // set display infos
+		this.newDisplay.width = GPU.displayWidths[data & 0x3];
+		if (data & 0x40)
+		{
+			if (this.newDisplay.width == 320)
+				this.newDisplay.width = 384;
+			else if (this.newDisplay.width == 256)
+				this.newDisplay.width = 352;
+		}
 		
-		case 0x03: // enable/disable display
-			this.psx.diags.warn("Implement the GPU.writeStatusRegister 'enable/disable display' case");
-			return;
+		if (data & 4)
+			this.newDisplay.height = 480;
+		else
+			this.newDisplay.height = 240;
 		
-		case 0x04: // set transfer mode
-			var transferMode = data & 0xffffff;
-			if (transferMode == 0)
-				this.imageTransfer = 0;
-			else if (transferMode == 2)
-				this.imageTransfer = 3;
-			return;
-		
-		case 0x05: // set display portion
-			this.display.y = (data >>> 10) & 0x3ff;
-			this.display.x = data & 0x3ff;
-			if (!this.display.lace)
-				this.updateDisplay();
-			return;
-		
-		case 0x06: // set width
-			this.psx.diags.warn("Implement the GPU.writeStatusRegister 'set width' case");
-			return;
-		
-		case 0x07: // set height
-			this.psx.diags.warn("Implement the GPU.writeStatusRegister 'set height' case");
-			return;
-		
-		case 0x08: // set display infos
-			this.newDisplay.width = GPU.displayWidths[data & 0x3];
-			if (data & 0x40)
-			{
-				if (this.newDisplay.width == 320)
-					this.newDisplay.width = 384;
-				else if (this.newDisplay.width == 256)
-					this.newDisplay.width = 352;
-			}
-			
-			if (data & 4)
-				this.newDisplay.height = 480;
-			else
-				this.newDisplay.height = 240;
-			
-			this.newDisplay.trueColor = (data >> 4) & 1; // 1 = true color
-			this.newDisplay.lace = (data >> 5) & 1; // 1 = interlace
-			// drawLace ?
-			this.updateDisplayIfChanged();
-			return;
-		
-		case 0x10: // get GPU infos
-			this.dataRegValue = 2; // return GPU version = 2
-			return;
-		
-		default:
-			this.psx.diags.error("GPU.writeStatusRegister: unknown command 0x%08x", command);
-			return;
+		this.newDisplay.trueColor = (data >> 4) & 1; // 1 = true color
+		this.newDisplay.lace = (data >> 5) & 1; // 1 = interlace
+		// drawLace ?
+		this.updateDisplayIfChanged();
+		return;
+	
+	case 0x10: // get GPU infos
+		this.dataRegValue = 2; // return GPU version = 2
+		return;
+	
+	default:
+		this.psx.diags.error("GPU.writeStatusRegister: unknown command 0x%08x", command);
+		return;
 	}
 }
 

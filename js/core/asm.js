@@ -18,23 +18,23 @@ Assembler.intifyValue = function(x, group)
 {
 	switch (group)
 	{
-		case 'd':
-		case 's':
-		case 't':
-			return Assembler.registerNames[x];
-		
-		case 'l':
-			return Assembler.cop0RegisterNames[x];
-		
-		case 'i<<2':
-			return parseInt(x, 16) >>> 2;
-		
-		case 'i':
-		case 'o':
-			return parseInt(x, 16);
-		
-		default:
-			throw new Error("can't assemble group type " + group);
+	case 'd':
+	case 's':
+	case 't':
+		return Assembler.registerNames[x];
+	
+	case 'l':
+		return Assembler.cop0RegisterNames[x];
+	
+	case 'i<<2':
+		return parseInt(x, 16) >>> 2;
+	
+	case 'i':
+	case 'o':
+		return parseInt(x, 16);
+	
+	default:
+		throw new Error("can't assemble group type " + group);
 	}
 }
 

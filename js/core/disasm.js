@@ -57,31 +57,31 @@ Disassembler.getOpcodeAsString = function(opcode)
 		var param = opcode.params[i];
 		switch (key)
 		{
-			case 'i':
-				if (format.indexOf('{i<<2}') != -1)
-				{
-					var jump = (param & 0xFFFF0000) == 0 ? (param << 16) >> 14 : param << 2;
-					format = format.replace('{i<<2}', unsign(jump).toString(16));
-				}
-				else
-				{
-					format = format.replace('{i}', param.toString(16));
-				}
-				break;
+		case 'i':
+			if (format.indexOf('{i<<2}') != -1)
+			{
+				var jump = (param & 0xFFFF0000) == 0 ? (param << 16) >> 14 : param << 2;
+				format = format.replace('{i<<2}', unsign(jump).toString(16));
+			}
+			else
+			{
+				format = format.replace('{i}', param.toString(16));
+			}
+			break;
+		
+		case 's':
+		case 'd':
+		case 't':
+			format = format.replace('{' + key + '}', Disassembler.registerNames[param]);
+			break;
+		
+		case 'l':
+			format = format.replace('{' + key + '}', Disassembler.cop0RegisterNames[param]);
+			break;
 			
-			case 's':
-			case 'd':
-			case 't':
-				format = format.replace('{' + key + '}', Disassembler.registerNames[param]);
-				break;
-			
-			case 'l':
-				format = format.replace('{' + key + '}', Disassembler.cop0RegisterNames[param]);
-				break;
-				
-			default:
-				format = format.replace('{' + key + '}', param);
-				break;
+		default:
+			format = format.replace('{' + key + '}', param);
+			break;
 		}
 		i++;
 	}

@@ -7,15 +7,15 @@ var PSX = function(diags, webgl, bios, controller1StateArray, controller2StateAr
 	this.bios = new GeneralPurposeBuffer(bios);
 	this.parallelPort = new ParallelPortMemoryRange(this);
 	
-	this.cpu = new R3000a(this);
+	// chips
 	this.mdec = new MotionDecoder(this);
 	this.gpu = new GPU(this, webgl);
 	this.spu = new SPU(this, null);
-	this.hardwareRegisters = new HardwareRegisters(this, this.mdec, this.gpu);
-	this.memory = new MemoryMap(this, this.hardwareRegisters, this.parallelPort, this.bios);
+	this.cpu = new R3000a(this);
 	
-	this.gpu.install(this.hardwareRegisters);
-	this.spu.install(this.hardwareRegisters);
+	// circuitry
+	this.hardwareRegisters = new HardwareRegisters(this, this.mdec, this.gpu, this.spu);
+	this.memory = new MemoryMap(this, this.hardwareRegisters, this.parallelPort, this.bios);
 	
 	this.pc = 0;
 }

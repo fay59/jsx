@@ -150,16 +150,16 @@ R3000a.prototype.writeCOP0 = function(reg, value)
 	
 	switch (reg)
 	{
-		case 12: // SR
-		{
-			// IsC
-			if ((oldValue & R3000a.srFlags.IsC) && !(value & R3000a.srFlags.IsC))
-				this.memory = this.memory.hidden;
-			else if (!(oldValue & R3000a.srFlags.IsC) && (value & R3000a.srFlags.IsC))
-				this.memory = new MemoryCache(this.memory);
-			
-			break;
-		}
+	case 12: // SR
+	{
+		// IsC
+		if ((oldValue & R3000a.srFlags.IsC) && !(value & R3000a.srFlags.IsC))
+			this.memory = this.memory.hidden;
+		else if (!(oldValue & R3000a.srFlags.IsC) && (value & R3000a.srFlags.IsC))
+			this.memory = new MemoryCache(this.memory);
+		
+		break;
+	}
 	}
 }
 
@@ -191,8 +191,12 @@ R3000a.prototype.run = function(pc, context)
 	return pc;
 }
 
+var calls = "";
 R3000a.prototype.executeBlock = function(address, context)
 {
+	calls += address + " à " + this.cycles + "\n";
+	if (this.cycles > 0x24c4fff)
+		this.__crash();
 	return this.memory.compiled.invoke(this, address, context);
 }
 

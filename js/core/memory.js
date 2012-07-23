@@ -151,7 +151,8 @@ MemoryMap.prototype.write8 = function(address, value)
 		MemoryMap.prototype.read32 = function(address)
 		{
 			var translated = this.translate(address);
-			return translated.buffer.u32[translated.offset >>> 2];
+			var result = translated.buffer.u32[translated.offset >>> 2];
+			return result;
 		}
 		
 		MemoryMap.prototype.write16 = function(address, value)

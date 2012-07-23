@@ -111,8 +111,8 @@ Debugger.prototype.reset = function(pc)
 		}
 	});
 	
-	this._eventCallback("stepped");
-	this._eventCallback("steppedinto");
+	this._eventCallback(Debugger.STEPPED_EVENT);
+	this._eventCallback(Debugger.STEPPED_INTO_EVENT);
 }
 
 Debugger.prototype.getGPR = function(index)
@@ -148,7 +148,7 @@ Debugger.prototype.stepOver = function()
 		if (opcode.params[0] == 31)
 		{
 			this.stack.pop();
-			this._eventCallback("steppedout");
+			this._eventCallback(Debugger.STEPPED_OUT_EVENT);
 		}
 	}
 	else
@@ -163,7 +163,7 @@ Debugger.prototype.stepOver = function()
 			this._handleException(ex);
 		}
 	}
-	this._eventCallback("stepped");
+	this._eventCallback(Debugger.STEPPED_EVENT);
 }
 
 Debugger.prototype.canStepInto = function()
@@ -197,8 +197,8 @@ Debugger.prototype.stepInto = function()
 		this.cpu.gpr[opcode.params[1]] = this.pc + 8;
 		this.pc = this.cpu.gpr[opcode.params[0]];
 	}
-	this._eventCallback("steppedinto");
-	this._eventCallback("stepped");
+	this._eventCallback(Debugger.STEPPED_INTO_EVENT);
+	this._eventCallback(Debugger.STEPPED_EVENT);
 }
 
 Debugger.prototype.runUntil = function(desiredPC)
@@ -220,26 +220,35 @@ Debugger.prototype.runUntil = function(desiredPC)
 
 Debugger.prototype.run = function()
 {
-	try
+	var self = this;
+	function _run()
 	{
-		this.cpu.run(this.pc, this);
+		try
+		{
+			self.cpu.run(self.pc, self);
+			self.diags.log("CPU yield at " + Recompiler.formatHex(self.pc));
+			self._eventCallback(Debugger.STEPPED_EVENT);
+			setTimeout(_run, 0);
+		}
+		catch (ex)
+		{
+			self._handleException(ex);
+		}
 	}
-	catch (ex)
-	{
-		this._handleException(ex);
-	}
+	
+	_run();
 }
 
 Debugger.prototype._enterFunction = function(returnAddress)
 {
 	this.stack.push(returnAddress);
-	this._eventCallback("steppedinto");
+	this._eventCallback(Debugger.STEPPED_INTO_EVENT);
 }
 
 Debugger.prototype._leaveFunction = function()
 {
 	this.stack.pop();
-	this._eventCallback("steppedout");
+	this._eventCallback(Debugger.STEPPED_OUT_EVENT);
 }
 
 Debugger.prototype._handleException = function(ex)
@@ -251,12 +260,12 @@ Debugger.prototype._handleException = function(ex)
 		this._lastHitBreakpoint._skipOnce = true;
 		
 		this.diags.log("stopped at 0x%08x", this.pc);
-		this._eventCallback("stepped");
+		this._eventCallback(Debugger.STEPPED_EVENT);
 	}
 	else
 	{
 		this.diags.error(ex.toString());
-		this._eventCallback("stepped");
+		this._eventCallback(Debugger.STEPPED_EVENT);
 	}
 }
 

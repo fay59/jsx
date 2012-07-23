@@ -301,11 +301,11 @@ function onload()
 	{
 		switch (e.which)
 		{
-			case 13: stepOver(); break;
-			case 39:
-				if (dbg.canStepInto())
-					dbg.stepInto();
-				break;
+		case 13: stepOver(); break;
+		case 39:
+			if (dbg.canStepInto())
+				dbg.stepInto();
+			break;
 		}
 	});
 }
