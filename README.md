@@ -1,11 +1,14 @@
-                ===JSX, a Javascript Playstation Emulator===
+JSX, a Javascript Playstation Emulator
+======================================
 
 JSX is a Playstation emulator written in Javascript. The goal of this project is
 to test the limit of modern Javascript engines and new technologies like WebGL
 by throwing at them a problem that developers traditionally solved with lower-
 level languages, like C++, C or even assembly.
 
-==Why the Playstation?==
+Why the Playstation?
+--------------------
+
 Out of the first consoles with 3D capabilities, the Playstation is by far the
 simplest. The Nintendo 64 sports three coprocessors that act in parallel, two of
 which with seemingly overlapping tasks and with instructions sets that are still
@@ -20,13 +23,17 @@ FPU, just one active processor and just a handful of connected devices. This
 makes it a much more convenient platform to emulate, especially under the tight
 constraints of Javascript.
 
-==Hardware and Memory==
+Hardware and Memory
+--------------------
+
 JSX has been written with some modularity in mind. Global variables are avoided
 like plague and disparate components are connected through the `Playstation`
 class. The `Memory` class implements the memory map, and special devices can
 wire themselves through the `HardwareRegisters` class.
 
-==CPU==
+CPU
+---
+
 The CPU core dynamically translates MIPS R3000a machine code into JS, leveraging
 most modern engines' ability to compile JS into native code. While most of the
 core instruction set has been implemented, instructions from the [Geometry
@@ -56,7 +63,9 @@ generator and to the `Memory` class keeps track of the generated functions, and
 when a memory write is performed, it will invalidate all functions in the 256
 bytes range it belongs to.
 
-==Running JSX==
+Running JSX
+-----------
+
 To run JSX, you will need to obtain a Playstation BIOS first. As this file is
 copyrighted by Sony, its distribution is illegal and you will need to [dump your
 Playstation][2] to obtain it.
