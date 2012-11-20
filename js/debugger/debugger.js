@@ -221,14 +221,13 @@ Debugger.prototype.runUntil = function(desiredPC)
 Debugger.prototype.run = function()
 {
 	var self = this;
-	function _run()
+	function run()
 	{
 		try
 		{
-			self.cpu.run(self.pc, self);
+			self.pc = self.cpu.run(self.pc, self);
 			self.diags.log("CPU yield at " + Recompiler.formatHex(self.pc));
-			self._eventCallback(Debugger.STEPPED_EVENT);
-			setTimeout(_run, 0);
+			setTimeout(run, 0);
 		}
 		catch (ex)
 		{
@@ -236,7 +235,7 @@ Debugger.prototype.run = function()
 		}
 	}
 	
-	_run();
+	setTimeout(run, 0);
 }
 
 Debugger.prototype._enterFunction = function(returnAddress)

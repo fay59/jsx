@@ -151,7 +151,6 @@ R3000a.prototype.writeCOP0 = function(reg, value)
 	switch (reg)
 	{
 	case 12: // SR
-	{
 		// IsC
 		if ((oldValue & R3000a.srFlags.IsC) && !(value & R3000a.srFlags.IsC))
 			this.memory = this.memory.hidden;
@@ -159,7 +158,6 @@ R3000a.prototype.writeCOP0 = function(reg, value)
 			this.memory = new MemoryCache(this.memory);
 		
 		break;
-	}
 	}
 }
 
@@ -174,6 +172,9 @@ R3000a.prototype.clock = function(ticks)
 	this.cycles = (this.cycles >>> 1) * 2 + lastBit;
 	
 	this.psx.hardwareRegisters.update();
+	
+	if (this.cycles == 0x24c4b2e)
+		console.log("Hit 24c4a7c");
 }
 
 R3000a.prototype.run = function(pc, context)

@@ -51,7 +51,7 @@ SPU.prototype.readRegister = function(reg)
 		{
 		case 12:
 			this.adsrDummyVol = !this.adsrDummyVol;
-			return this.adsrDummyVol;
+			return this.adsrDummyVol | 0;
 		
 		case 14:
 			return 0;
@@ -126,23 +126,9 @@ SPU.prototype.writeDMAMem = function(array, start, size)
 
 SPU.prototype.install = function(hwregs)
 {
-	// voices
-	for (var i = 0; i < 0x18; i++)
+	for (var address = 0x1f801c00; address < 0x1f801de0; address += 2)
 	{
-		var baseAddress = 0x1f801c00 + (i << 4);
-		for (var j = 0; j < 6; j++)
-		{
-			var address = baseAddress + (j << 1);
-			hwregs.wire16(address,
-				this.readRegister.bind(this, address & 0xfff),
-				this.writeRegister.bind(this, address & 0xfff));
-		}
-	}
-	
-	// control registers
-	for (var i = 0x1f801d80; i < 0x1f801da0; i += 2)
-	{
-		hwregs.wire16(i,
+		hwregs.wire16(address,
 			this.readRegister.bind(this, address & 0xfff),
 			this.writeRegister.bind(this, address & 0xfff));
 	}

@@ -109,6 +109,7 @@ MemoryMap.prototype.write8 = function(address, value)
 
 // see below for the other read/write functions
 
+		var hardwareReads = "";
 (function()
 {
 	var endianTestBuffer = new ArrayBuffer(2);
@@ -144,14 +145,19 @@ MemoryMap.prototype.write8 = function(address, value)
 		
 		MemoryMap.prototype.read16 = function(address)
 		{
-			var translated = this.translate(address);
-			return translated.buffer.u16[translated.offset >>> 1];
+			var translated = this.translate(address);	
+			var result = translated.buffer.u16[translated.offset >>> 1];
+			if (translated.buffer.zoneName == "hardware")
+				hardwareReads += this.psx.cpu.cycles.toString(16) + ": " + address.toString(16) + " = " + result.toString(16) + "\n";
+			return result;
 		}
 		
 		MemoryMap.prototype.read32 = function(address)
 		{
 			var translated = this.translate(address);
 			var result = translated.buffer.u32[translated.offset >>> 2];
+			if (translated.buffer.zoneName == "hardware")
+				hardwareReads += this.psx.cpu.cycles.toString(16) + ": " + address.toString(16) + " = " + result.toString(16) + "\n";
 			return result;
 		}
 		

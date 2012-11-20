@@ -1,7 +1,12 @@
 var Recompiler = function()
 {
 	this.injectors = [];
-	this.tryToOptimize = true;
+	
+	this.optimizations = {
+		foldConstants: true,
+		bypassReadMethods: true,
+		bypassWriteMethods: true
+	};
 }
 
 Recompiler.prototype.recompileFunction = function(memory, startAddress)
@@ -20,8 +25,7 @@ Recompiler.prototype.recompileFunction = function(memory, startAddress)
 	jsCode += this._injectAfterBranch();
 	jsCode += "switch (pc) {\n";
 	
-	var optimize = this.tryToOptimize && this.injectors.length == 0;
-	var context = new Recompiler.Context(memory, optimize);
+	var context = new Recompiler.Context(memory, this.optimizations);
 	context.analyzeBranches(startAddress);
 	for (var i = 0; i < context.labels.length; i++)
 	{
@@ -195,9 +199,9 @@ Recompiler.formatHex = function(address, length)
 	return output;
 }
 
-Recompiler.Context = function(memory, optimize)
+Recompiler.Context = function(memory, optimizations)
 {
-	this.optimize = optimize;
+	this.opt = optimizations;
 	this.gprValues = new Uint32Array(34);
 	this.known = [true];
 	for (var i = 1; i < 34; i++)
@@ -380,7 +384,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 		if (reg == 0)
 			return 0;
 		
-		if (this.optimize && this.known[reg])
+		if (this.opt.foldConstants && this.known[reg])
 			return this.gprValues[reg];
 		
 		return "this.gpr[" + reg + "]";
@@ -403,7 +407,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 		if (dest == 0) return;
 		
 		var sourceValue = this.gpr(source);
-		if (this.optimize && isKnown(sourceValue) && isKnown(value))
+		if (this.opt.foldConstants && isKnown(sourceValue) && isKnown(value))
 		{
 			this.setReg(dest, eval("sourceValue" + op + "value"));
 			return;
@@ -423,7 +427,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 		if (dest == 0) return;
 		
 		var sourceValue = this.gpr(source);
-		if (this.optimize && isKnown(sourceValue) && isKnown(value))
+		if (this.opt.foldConstants && isKnown(sourceValue) && isKnown(value))
 		{
 			var overflowChecked = eval("sourceValue" + op + "value");
 			if (overflowChecked > 0xFFFFFFFF || overflowChecked < -0x80000000)
@@ -463,7 +467,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 		// havoc on situations like lw t0, t0+5
 		this.setReg(into, null);
 		offset = signExt(offset, 16);
-		if (isKnown(address))
+		if (this.opt.bypassReadMethods && isKnown(address))
 		{
 			var targetAddress = Recompiler.unsign(address) + offset;
 			var translated = this.memory.translate(targetAddress);
@@ -683,7 +687,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	impl("div", function(s, t) {
 		var sVal = this.gpr(s);
 		var tVal = this.gpr(t);
-		if (this.optimize && isKnown(sVal) && isKnown(tVal))
+		if (this.opt.foldConstants && isKnown(sVal) && isKnown(tVal))
 		{
 			sVal |= 0;
 			tVal |= 0;
@@ -704,7 +708,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	impl("divu", function(s, t) {
 		var sVal = this.gpr(s);
 		var tVal = this.gpr(t);
-		if (this.optimize && isKnown(sVal) && isKnown(tVal))
+		if (this.opt.foldConstants && isKnown(sVal) && isKnown(tVal))
 		{
 			this.setReg(32, sVal % tVal);
 			this.setReg(33, sVal / tVal);
@@ -797,7 +801,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	});
 	
 	impl("lui", function(t, i) {
-		if (this.optimize)
+		if (this.opt.foldConstants)
 			this.setReg(t, i << 16);
 		else
 			return this.gpr(t) + " = " + (i << 16) + ";\n";
@@ -834,7 +838,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	
 	impl("mfhi", function(d) {
 		var hi = this.gpr(32);
-		if (this.optimize && isKnown(hi))
+		if (this.opt.foldConstants && isKnown(hi))
 			this.setReg(d, hi);
 		else
 		{
@@ -845,7 +849,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	
 	impl("mflo", function(d) {
 		var lo = this.gpr(33);
-		if (this.optimize && isKnown(lo))
+		if (this.opt.foldConstants && isKnown(lo))
 			this.setReg(d, lo);
 		else
 		{
@@ -865,7 +869,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	
 	impl("mthi", function(d) {
 		var dValue = this.gpr(d);
-		if (this.optimize && isKnown(dValue))
+		if (this.opt.foldConstants && isKnown(dValue))
 			this.setReg(32, dValue);
 		else
 		{
@@ -876,7 +880,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	
 	impl("mtlo", function(d) {
 		var dValue = this.gpr(d);
-		if (this.optimize && isKnown(dValue))
+		if (this.opt.foldConstants && isKnown(dValue))
 			this.setReg(33, dValue);
 		else
 		{
@@ -893,7 +897,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	impl("multu", function(s, t) {
 		var sValue = this.gpr(s);
 		var tValue = this.gpr(t);
-		if (this.optimize && isKnown(sValue) && isKnown(tValue))
+		if (this.opt.foldConstants && isKnown(sValue) && isKnown(tValue))
 		{
 			R3000a.runtime.multu(this.gprValues, sValue, tValue);
 			this.known[32] = true;
@@ -950,7 +954,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	impl("nor", function(s, t, d) {
 		var sValue = this.gpr(s);
 		var tValue = this.gpr(t);
-		if (this.optimize && isKnown(sValue) && isKnown(tValue))
+		if (this.opt.foldConstants && isKnown(sValue) && isKnown(tValue))
 			this.setReg(d, ~(sValue | tValue));
 		else
 		{
@@ -1000,7 +1004,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	impl("slt", function(s, t, d) {
 		var sValue = this.gpr(s);
 		var tValue = this.gpr(t);
-		if (this.optimize && isKnown(sValue) && isKnown(tValue))
+		if (this.opt.foldConstants && isKnown(sValue) && isKnown(tValue))
 			this.setReg(d, ((sValue | 0) < (tValue | 0)) | 0);
 		else
 		{
@@ -1011,7 +1015,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	
 	impl("slti", function(s, t, i) {
 		var sValue = this.gpr(s);
-		if (this.optimize && isKnown(sValue) && isKnown(tValue))
+		if (this.opt.foldConstants && isKnown(sValue) && isKnown(tValue))
 			this.setReg(t, ((sValue | 0) < signExt(i, 16)) | 0);
 		else
 		{
@@ -1022,7 +1026,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	
 	impl("sltiu", function(s, t, i) {
 		var sValue = this.gpr(s);
-		if (this.optimize && isKnown(sValue) && isKnown(tValue))
+		if (this.opt.foldConstants && isKnown(sValue) && isKnown(tValue))
 			this.setReg(t, (sValue < Recompiler.unsign(signExt(i, 16))) | 0);
 		else
 		{
@@ -1034,7 +1038,7 @@ Recompiler.Context.prototype.countUnimplemented = function(instruction)
 	impl("sltu", function(s, t, d) {
 		var sValue = this.gpr(s);
 		var tValue = this.gpr(t);
-		if (this.optimize && isKnown(sValue) && isKnown(tValue))
+		if (this.opt.foldConstants && isKnown(sValue) && isKnown(tValue))
 			this.setReg(d, (Recompiler.unsign(sValue) < Recompiler.unsign(tValue)) | 0);
 		else
 		{

@@ -10,8 +10,13 @@ document.addEventListener("DOMContentLoaded", including.bind(null,
 		{
 			var tv = document.querySelector("#tv");
 			var gl = tv.getContext("experimental-webgl");
-			window.psx = new PSX(console, gl, reader.result, [], []);
+			window.psx = new PSX(PSX.noDiags, gl, reader.result, [], []);
 			window.psx.reset();
+			with (window.psx.cpu.memory.compiled.recompiler.optimizations)
+			{
+				bypassReadMethods = false;
+				bypassWriteMethods = false;
+			}
 			
 			try
 			{

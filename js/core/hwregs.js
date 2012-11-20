@@ -108,10 +108,7 @@ HardwareRegisters.unimplementedRegistersList = [
 	0x1f801070, 0x1f801074,
 	
 	// DMA stuff
-	0x1f8010f0, 0x1f8010f4,
-	
-	// SPU
-	0x1f801da6, 0x1f801da8, 0x1f801daa, 0x1f801dac, 0x1f801dae
+	0x1f8010f0, 0x1f8010f4
 ];
 
 HardwareRegisters.unimplementedRegisters = {};
@@ -134,7 +131,7 @@ HardwareRegisters.prototype._attachDevices = function()
 		var address = 0x1F801000 + index;
 		return function()
 		{
-			if (address in HardwareRegisters.unimplementedRegisters)
+			if (!(address in HardwareRegisters.unimplementedRegisters))
 			{
 				self.unknownReads[address] = true;
 				self.psx.diags.warn("reading register %x", address);
@@ -148,7 +145,7 @@ HardwareRegisters.prototype._attachDevices = function()
 		var address = 0x1F801000 + index;
 		return function(value)
 		{
-			if (address in HardwareRegisters.unimplementedRegisters)
+			if (!(address in HardwareRegisters.unimplementedRegisters))
 			{
 				self.unknownWrites[address] = true;
 				self.psx.diags.warn("writing register %x -> %x", address, value);
@@ -190,7 +187,7 @@ HardwareRegisters.prototype._attachDevices = function()
 
 ;(function()
 {
-	for (var i = 0; i < HardwareRegisters.unimplementedRegistersList; i++)
+	for (var i = 0; i < HardwareRegisters.unimplementedRegistersList.length; i++)
 	{
 		var key = HardwareRegisters.unimplementedRegistersList[i];
 		HardwareRegisters.unimplementedRegisters[key] = true;
